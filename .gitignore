@@ -4,3 +4,32 @@ dist/
 .env*
 coverage/
 *.log
+
+# Claude Code: local-only state (skills/ y CLAUDE.md sí se versionan)
+.claude/settings.local.json
+.claude/worktrees/
+.mcp.json
+CLAUDE.local.md
+
+# AWS / credenciales
+.aws/
+*.pem
+*.key
+samconfig.toml
+cdk.out/
+cdk.context.json
+
+# Python
+__pycache__/
+.venv/
+*.pyc
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# graphify output
+graphify-out/
