@@ -241,7 +241,52 @@ Resources:
       UserPoolId: !Ref UserPool
       Domain: !Ref CognitoDomainPrefix
 
+  # ---------------------------------------------------------------------------
+  # T028 - HTTP API = Policy Enforcement Point (design §6.1)
+  # El JWT authorizer valida emisor, firma, expiración y client_id (los access tokens de
+  # Cognito no llevan `aud`; API Gateway compara `audience` con `aud` o `client_id`).
+  # Cada ruta protegida declara Auth.Authorizer y AuthorizationScopes en su función
+  # (T042 y siguientes): un ID token no tiene `scope`, por eso es rechazado (CA-NF02.1, T11).
+  # No se define DefaultAuthorizer: las rutas públicas (GET /v1/projects...) no llevan authorizer.
+  # ---------------------------------------------------------------------------
+  ApiAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 14 # CA-NF07.1
+
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Stage
+      Auth:
+        Authorizers:
+          JwtAuthorizer:
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}"
+              audience:
+                - !Ref SpaClient
+      DefaultRouteSettings:
+        ThrottlingRateLimit: 20 # solicitudes por segundo (research R-06)
+        ThrottlingBurstLimit: 40
+      CorsConfiguration:
+        AllowOrigins: !If
+          - HasWebOrigin
+          - ["http://localhost:5173", !Ref WebOrigin]
+          - ["http://localhost:5173"]
+        AllowMethods: [GET, POST, PATCH, OPTIONS]
+        AllowHeaders: [Authorization, Content-Type, Idempotency-Key]
+        MaxAge: 600
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogGroup.Arn
+        # JSON sin Authorization, tokens ni sub (CA-NF01.2, CA-NF07.1)
+        Format: >-
+          {"requestId":"$context.requestId","routeKey":"$context.routeKey","status":"$context.status","responseLength":"$context.responseLength","responseLatency":"$context.responseLatency","integrationLatency":"$context.integrationLatency","authorizerError":"$context.authorizer.error"}
+
 Outputs:
+  ApiUrl:
+    Description: URL base de la HTTP API (stage academic)
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
   UserPoolId:
     Description: ID del user pool de Cognito
     Value: !Ref UserPool
