@@ -1,0 +1,267 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >-
+  Plataforma de Donaciones Seguras (Fundación AQP-SOLIDARIA) - prototipo académico Zero Trust.
+  Pila base: DynamoDB (T025) y Cognito (T026). Las funciones Lambda, la HTTP API y el frontend
+  se añaden en tareas posteriores (T027, T028, T042 y siguientes, T094).
+
+# Trazabilidad: RNF-HU-02, RNF-HU-03, RNF-HU-04, CA-03.1, CA-03.3, CA-11.1, CA-NF02.1, CA-NF08.2
+# Región objetivo: us-east-2 (research R-01). Sin Account ID ni secretos en este archivo.
+
+Metadata:
+  cfn-lint:
+    config:
+      # W8001: la condición IsAcademic la usa la ruta de simulación (T079), aún no añadida.
+      ignore_checks: [W8001]
+
+Parameters:
+  Stage:
+    Type: String
+    Default: academic
+    AllowedValues: [academic]
+    Description: >-
+      Único stage permitido. La ruta de simulación solo existe cuando Stage = academic (CA-06.1).
+  CognitoDomainPrefix:
+    Type: String
+    Default: zerotrust-lab04-aqp
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{2,62}[a-z0-9]$"
+    Description: >-
+      Prefijo del dominio de Cognito (managed login). Debe ser único en la región; si ya está
+      tomado, cambiarlo al desplegar.
+  WebOrigin:
+    Type: String
+    Default: ""
+    Description: >-
+      Origen HTTPS del frontend (por ejemplo https://dxxxx.cloudfront.net). Vacío hasta T094; con
+      valor, se añade a las URLs de retorno de Cognito.
+
+Conditions:
+  IsAcademic: !Equals [!Ref Stage, academic]
+  HasWebOrigin: !Not [!Equals [!Ref WebOrigin, ""]]
+
+Globals:
+  Function:
+    Runtime: nodejs24.x
+    Architectures: [arm64]
+    Timeout: 10
+    MemorySize: 256
+    Environment:
+      Variables:
+        STACK_ID: !Ref AWS::StackId
+        PROJECTS_TABLE: !Ref ProjectsTable
+        DONATIONS_TABLE: !Ref DonationsTable
+        IDEMPOTENCY_TABLE: !Ref IdempotencyTable
+        AUDIT_TABLE: !Ref AuditEventsTable
+
+Resources:
+  # ---------------------------------------------------------------------------
+  # T025 - DynamoDB (on-demand, cifrado en reposo por defecto, sin streams)
+  # Modelo: specs/001-donaciones-seguras/data-model.md
+  # ---------------------------------------------------------------------------
+  ProjectsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: false # permite `sam delete` (CA-NF08.2, CA-NF09.2)
+      AttributeDefinitions:
+        - { AttributeName: projectId, AttributeType: S }
+        - { AttributeName: status, AttributeType: S }
+        - { AttributeName: createdAt, AttributeType: S }
+      KeySchema:
+        - { AttributeName: projectId, KeyType: HASH }
+      GlobalSecondaryIndexes:
+        - IndexName: status-createdAt
+          KeySchema:
+            - { AttributeName: status, KeyType: HASH }
+            - { AttributeName: createdAt, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+
+  DonationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: false
+      AttributeDefinitions:
+        - { AttributeName: donationId, AttributeType: S }
+        - { AttributeName: donorSub, AttributeType: S }
+        - { AttributeName: createdAt, AttributeType: S }
+      KeySchema:
+        - { AttributeName: donationId, KeyType: HASH }
+      GlobalSecondaryIndexes:
+        - IndexName: donorSub-createdAt
+          KeySchema:
+            - { AttributeName: donorSub, KeyType: HASH }
+            - { AttributeName: createdAt, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+
+  IdempotencyTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: false
+      AttributeDefinitions:
+        - { AttributeName: pk, AttributeType: S }
+      KeySchema:
+        - { AttributeName: pk, KeyType: HASH }
+      TimeToLiveSpecification:
+        AttributeName: expiresAt # 24 h desde el primer uso (research R-07)
+        Enabled: true
+
+  AuditEventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: false
+      AttributeDefinitions:
+        - { AttributeName: eventType, AttributeType: S }
+        - { AttributeName: sk, AttributeType: S }
+      KeySchema:
+        - { AttributeName: eventType, KeyType: HASH }
+        - { AttributeName: sk, KeyType: RANGE }
+
+  # ---------------------------------------------------------------------------
+  # T026 - Cognito (research R-02, R-03)
+  # MFA OPTIONAL a nivel de pool + trigger PreAuthentication (T027) que bloquea a GESTOR y
+  # AUDITOR sin TOTP. Solo TOTP: sin SMS (CA-11.1).
+  # ---------------------------------------------------------------------------
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${AWS::StackName}-users"
+      DeletionProtection: INACTIVE # permite eliminar la pila (CA-NF09.2)
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      MfaConfiguration: OPTIONAL
+      EnabledMfas: [SOFTWARE_TOKEN_MFA]
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          TemporaryPasswordValidityDays: 3
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true # usuarios de prueba creados por el equipo (T030)
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - { Name: verified_email, Priority: 1 }
+      Schema:
+        - { Name: email, AttributeDataType: String, Required: true, Mutable: true }
+      # T027 añadirá LambdaConfig.PreAuthentication apuntando a PreAuthFn.
+
+  GroupDonante:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref UserPool
+      GroupName: DONANTE
+      Description: Puede crear intenciones de donación simuladas y ver su historial.
+
+  GroupGestor:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref UserPool
+      GroupName: GESTOR
+      Description: Crea, edita y publica proyectos. MFA TOTP obligatorio.
+
+  GroupAuditor:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref UserPool
+      GroupName: AUDITOR
+      Description: Consulta eventos de auditoría. MFA TOTP obligatorio.
+
+  ResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      Identifier: api
+      Name: Donaciones API
+      Scopes:
+        - { ScopeName: projects.write, ScopeDescription: "Crear, editar y publicar proyectos" }
+        - { ScopeName: donations.write, ScopeDescription: "Crear y simular donaciones propias" }
+        - { ScopeName: donations.read, ScopeDescription: "Leer el historial propio" }
+        - { ScopeName: audit.read, ScopeDescription: "Consultar eventos de auditoría" }
+
+  # App client público de la SPA: Authorization Code + PKCE, sin secreto (CA-03.1).
+  # No concede aws.cognito.signin.user.admin: el usuario no puede desactivar su propio MFA.
+  SpaClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: ResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: spa-public
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true # CA-03.3
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - api/projects.write
+        - api/donations.write
+        - api/donations.read
+        - api/audit.read
+      SupportedIdentityProviders: [COGNITO]
+      ExplicitAuthFlows: [ALLOW_REFRESH_TOKEN_AUTH] # sin ALLOW_USER_PASSWORD_AUTH
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: minutes
+      AccessTokenValidity: 15 # ≤ 15 min (CA-03.3, AD-07)
+      IdTokenValidity: 15
+      RefreshTokenValidity: 60
+      RefreshTokenRotation:
+        Feature: ENABLED
+        RetryGracePeriodSeconds: 0
+      CallbackURLs: !If
+        - HasWebOrigin
+        - ["http://localhost:5173/callback", !Sub "${WebOrigin}/callback"]
+        - ["http://localhost:5173/callback"]
+      LogoutURLs: !If
+        - HasWebOrigin
+        - ["http://localhost:5173/", !Sub "${WebOrigin}/"]
+        - ["http://localhost:5173/"]
+
+  # App client administrativo: sin OAuth, solo para enrolar TOTP de GESTOR/AUDITOR con
+  # credenciales IAM del equipo (T030). No lo usa la SPA.
+  AdminCliClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: admin-cli
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows: [ALLOW_ADMIN_USER_PASSWORD_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Ref CognitoDomainPrefix
+
+Outputs:
+  UserPoolId:
+    Description: ID del user pool de Cognito
+    Value: !Ref UserPool
+  UserPoolIssuer:
+    Description: Emisor (issuer) para el JWT authorizer
+    Value: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}"
+  SpaClientId:
+    Description: Client ID de la SPA (público, sin secreto)
+    Value: !Ref SpaClient
+  AdminCliClientId:
+    Description: Client ID del cliente administrativo (enrolamiento TOTP)
+    Value: !Ref AdminCliClient
+  CognitoDomainUrl:
+    Description: Dominio de managed login
+    Value: !Sub "https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
+  ProjectsTableName:
+    Value: !Ref ProjectsTable
+  DonationsTableName:
+    Value: !Ref DonationsTable
+  IdempotencyTableName:
+    Value: !Ref IdempotencyTable
+  AuditEventsTableName:
+    Value: !Ref AuditEventsTable
