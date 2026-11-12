@@ -66,10 +66,25 @@ aws cognito-idp admin-get-user --region $REGION --user-pool-id $POOL --username 
   --query "{mfa:UserMFASettingList,preferred:PreferredMfaSetting}"
 ```
 
+> El `SecretCode` se imprime **una sola vez**: no se captura ni se pega en el repo, el informe o un chat.
+
+## 3.1 Variante para Windows (PowerShell)
+
+`scripts/create-test-user.ps1` ejecuta los mismos pasos en el orden correcto, pide la contraseña por consola (`SecureString`, no se escribe en ningún archivo) y limpia la pantalla después de mostrar el secreto TOTP. Requiere sesión iniciada (`aws login --profile zerotrust-lab04`) y se ejecuta desde la raíz del repo:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/create-test-user.ps1 -Email donante1@example.com -Group DONANTE
+powershell -ExecutionPolicy Bypass -File scripts/create-test-user.ps1 -Email gestor1@example.com -Group GESTOR
+powershell -ExecutionPolicy Bypass -File scripts/create-test-user.ps1 -Email gestor-sin-mfa@example.com -Group GESTOR -SkipMfa
+```
+
+`-SkipMfa` solo se usa para el usuario de la prueba **T14** (ver §4): lo agrega al grupo sin enrolar TOTP.
+
 ## 4. Usuario para T14 (GESTOR sin TOTP)
 
 Crear `gestor-sin-mfa@example.com` con el paso 1 y agregarlo directamente a `GESTOR` sin el paso 3.
 Al iniciar sesión en la SPA, managed login muestra el error del trigger y no se emiten tokens.
+Esta prueba solo tiene sentido **después** de desplegar `PreAuthFn`.
 
 ## 5. Tokens para pruebas de API
 
@@ -81,10 +96,22 @@ export API_URL=$(out ApiUrl) ID_TOKEN=$DONOR_ID_TOKEN
 
 ## 6. Usuarios creados
 
-| Usuario (ficticio) | Grupo | MFA TOTP | Uso |
-|---|---|---|---|
-| donante1@example.com | DONANTE | opcional | T02–T09, T13 |
-| donante2@example.com | DONANTE | opcional | T09 (BOLA) |
-| gestor1@example.com | GESTOR | sí | HU-08, T03, T12 |
-| auditor1@example.com | AUDITOR | sí | HU-10 |
-| gestor-sin-mfa@example.com | GESTOR | no | T14 |
+Verificados con `admin-get-user` y `admin-list-groups-for-user` el 2026-11-11 (todos en estado `CONFIRMED`):
+
+| Usuario (ficticio) | Grupo | MFA TOTP | Uso | Estado |
+|---|---|---|---|---|
+| donante1@example.com | DONANTE | opcional (sin MFA) | T02–T09, T13 | Creado |
+| donante2@example.com | DONANTE | opcional (sin MFA) | T09 (BOLA) | Creado |
+| gestor1@example.com | GESTOR | sí (`SOFTWARE_TOKEN_MFA` preferido) | HU-08, T03, T12 | Creado |
+| auditor1@example.com | AUDITOR | sí (`SOFTWARE_TOKEN_MFA` preferido) | HU-10 | Creado |
+| gestor-sin-mfa@example.com | GESTOR | no | T14 | Pendiente |
+
+## 7. Evidencia que se guarda
+
+- Captura de los usuarios en Cognito (consola → User pools → Users), con grupos.
+- Captura del resumen final del script o de la verificación de MFA (sin el secreto).
+- Para **T14**: ver `evidence/` cuando `PreAuthFn` esté desplegado.
+
+## 8. Limpieza
+
+Los usuarios pertenecen al user pool y se eliminan con la pila (`sam delete`). Ver `evidence/RNF-HU-09-limpieza.md`.
