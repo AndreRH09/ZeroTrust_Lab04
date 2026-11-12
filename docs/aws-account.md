@@ -11,9 +11,9 @@ El equipo usa **una cuenta AWS en Free plan** (una por equipo, RNF-HU-09). La cu
 
 | Verificación | Cómo | Resultado | Evidencia |
 |---|---|---|---|
-| Plan de cuenta | `aws freetier get-account-plan-state` | [accountPlanType: FREE / PAID] | `evidence/aws-plan.png` |
-| Dueño de la cuenta | AWS Settings → View all projects | [nombre del project, sin Account ID] | [captura] |
-| Integrantes con acceso | AWS Settings → team members | [lista de los 4 integrantes] | [captura] |
+| Plan de cuenta | `aws freetier get-account-plan-state` | `accountPlanType: FREE`, `accountPlanStatus: ACTIVE`; créditos restantes 119.87 USD; vence el 2027-05-05 | `evidence/aws-plan.png` |
+| Dueño de la cuenta | AWS Settings → View all projects | Project «Console Dot Dream»; propietario: Andre Añazco | [captura de la pantalla del project, tapando correos] |
+| Integrantes con acceso | AWS Settings → Miembros | 2 de 4 al [fecha] (Alex y Andre); pendiente invitar a los otros dos | [captura] |
 
 ## 2. Región
 
@@ -47,10 +47,10 @@ No se usan: MFA por SMS, Cognito Plus, AWS WAF, Verified Access, GuardDuty ni Se
 
 | Control | Requisito | Estado | Evidencia |
 |---|---|---|---|
-| MFA en el usuario raíz (root) y sin uso diario | CA-NF03.3 | [hecho] | [captura] |
-| Cada integrante con acceso propio y **MFA** | CA-NF03.3 | [hecho: 4/4] | [captura] |
+| MFA del propietario del project (Andre) y sin uso de la cuenta raíz | CA-NF03.3 | [pendiente de confirmar con Andre] | [captura de Andre] |
+| Cada integrante con acceso propio y **MFA** | CA-NF03.3 | Alex: hecho el 11-nov-2026, dispositivo TOTP `alex-telefono` en AWS Builder ID → Seguridad. Pendiente: Andre, César y Paul | Captura de la lista de dispositivos MFA (sin IP ni códigos) |
 | Sin llaves de acceso de larga duración (no `AKIA…`) | CA-NF03.2 | [hecho] | `aws iam list-access-keys` vacío |
-| Credenciales temporales para desplegar (perfil `zerotrust-lab04`) | T029 | [hecho] | `aws sts get-caller-identity` (tapando Account ID) |
+| Credenciales temporales para desplegar (perfil `zerotrust-lab04`) | T029 | Hecho: `aws login` crea una sesión temporal con el rol asumido `AccountFullAccessRole`; no hay llaves de larga duración | `aws sts get-caller-identity` (tapando Account ID) |
 | Sin credenciales AWS en el repo ni en CI | CA-NF03.2 | verificado con secret scanning | Ajustes del repo |
 
 > **Nota sobre IAM:** en la «nueva experiencia» el acceso humano lo gestiona AWS (los integrantes se invitan por correo como *team members*). Se documenta aquí cómo se cumple el objetivo de CA-NF03.3 (sin root, MFA, sin llaves persistentes) con ese modelo.
@@ -59,11 +59,16 @@ No se usan: MFA por SMS, Cognito Plus, AWS WAF, Verified Access, GuardDuty ni Se
 
 | Campo | Valor |
 |---|---|
-| Tipo | Presupuesto de costos mensual |
-| Monto | [p. ej. 1 USD] |
-| Alertas | [80 % real / 100 % pronosticado] |
-| Destinatarios | [correos del equipo] |
-| Evidencia | [captura de la consola de Billing and Cost Management] |
+| Nombre | `zerotrust-lab04-presupuesto` |
+| Tipo | Presupuesto de costos mensual (plantilla simplificada de Budgets) |
+| Monto | 1,00 USD |
+| Estado al crearlo | ACEPTAR (importe utilizado 0,00 %) |
+| Alertas | [umbrales de la plantilla: confirmar en el detalle del presupuesto] |
+| Destinatarios | [correos del equipo, sin publicarlos] |
+| Creado por | Alex, el [fecha], desde Billing and Cost Management del project «Console Dot Dream» |
+| Evidencia | Captura de la lista de presupuestos con el aviso «se ha creado correctamente» |
+
+**Nivel gratuito (comprobación del Free plan):** 0 ofertas de servicio en uso y 139,87 USD de crédito restante tras crear el presupuesto (la consulta por CLI había dado 119,87 USD antes; el aumento probablemente es crédito por completar una actividad del Free plan, [verificar en «Ver detalles»]). Evidencia: captura de la página *Nivel gratuito*.
 
 ## 6. Herramientas locales
 
