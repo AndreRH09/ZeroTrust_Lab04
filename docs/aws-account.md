@@ -1,7 +1,7 @@
 # Cuenta AWS — configuración segura (T009)
 
 > Trazabilidad: CA-NF09.1, CA-NF03.3, CA-NF03.2, RNF-HU-03, RNF-HU-09 · Tarea T009 (y registro de T029)
-> Responsable: integrante con rol DevOps/AWS · Última actualización: [fecha]
+> Responsable: integrante con rol DevOps/AWS · Última actualización: 2026-11-12
 >
 > **Regla de evidencias:** tapar el Account ID, tokens, correos reales y cualquier secreto antes de guardar una captura (ver `evidence/README.md`). Los comandos se muestran sin salida sensible.
 
@@ -12,8 +12,8 @@ El equipo usa **una cuenta AWS en Free plan** (una por equipo, RNF-HU-09). La cu
 | Verificación | Cómo | Resultado | Evidencia |
 |---|---|---|---|
 | Plan de cuenta | `aws freetier get-account-plan-state` | `accountPlanType: FREE`, `accountPlanStatus: ACTIVE`; créditos restantes ≈ 140 USD; vence el 2027-05-05 | `evidence/aws-plan.png` |
-| Dueño de la cuenta | AWS Settings → View all projects | Project «Console Dot Dream»; el propietario figura en AWS Settings (se omite su nombre: el repositorio es público) | [captura de la pantalla del project, tapando nombres y correos] |
-| Integrantes con acceso | AWS Settings → Miembros | 2 de 4 al [fecha]; pendiente invitar a los otros dos integrantes | [captura, tapando nombres y correos] |
+| Dueño de la cuenta | AWS Settings → View all projects | Project «Console Dot Dream»; el propietario figura en AWS Settings (se omite su nombre: el repositorio es público) | Captura de la pantalla del project (sin nombres ni correos) en el informe técnico |
+| Integrantes con acceso | AWS Settings → Miembros | 2 de 4 al 2026-11-11; pendiente invitar a los otros dos integrantes | Captura de la lista de miembros (sin nombres ni correos) en el informe técnico |
 
 ## 2. Región
 
@@ -45,7 +45,7 @@ Antes de desplegar se comprobó que cada servicio está en la lista oficial de s
 | Amazon Verified Permissions | Extensión HU-12 (opcional) | Sí |
 | IAM Access Analyzer | Evidencia de mínimo privilegio (T097) | **Parcial**: solo la validación de políticas está incluida; el análisis de acceso externo no está soportado. Para T10 se usa el IAM Policy Simulator |
 
-Fuente: lista oficial «AWS services included in the Free Tier of our new AWS experience» (docs.aws.amazon.com/accounts/latest/reference/supported-services-sign-up-new.html), consultada el [fecha] por el integrante DevOps. Evidencia: [captura de la lista].
+Fuente: lista oficial «AWS services included in the Free Tier of our new AWS experience» (docs.aws.amazon.com/accounts/latest/reference/supported-services-sign-up-new.html), consultada el 2026-11-11 por el integrante DevOps. Evidencia: captura de la lista en el informe técnico.
 
 No se usan: MFA por SMS, Cognito Plus ni AWS WAF (la HTTP API no se integra con WAF directamente, `design.md` §6.3). No están soportados en esta experiencia: AWS Verified Access, Amazon GuardDuty, AWS Security Hub, IAM Identity Center, AWS Organizations, AWS Shield; coincide con las limitaciones que declara el diseño. Todas las funciones y recursos se crean en una sola región, porque no se soportan características multirregión.
 
@@ -53,9 +53,9 @@ No se usan: MFA por SMS, Cognito Plus ni AWS WAF (la HTTP API no se integra con 
 
 | Control | Requisito | Estado | Evidencia |
 |---|---|---|---|
-| MFA del propietario del project y sin uso de la cuenta raíz | CA-NF03.3 | [pendiente de confirmar con el propietario] | [captura del propietario, sin datos personales] |
+| MFA del propietario del project y sin uso de la cuenta raíz | CA-NF03.3 | **Pendiente de confirmar con el propietario** (no verificable desde un acceso de miembro) | Captura del propietario, sin datos personales, cuando la entregue |
 | Cada integrante con acceso propio y **MFA** | CA-NF03.3 | Integrante DevOps: hecho el 11-nov-2026, dispositivo TOTP en AWS Builder ID → Seguridad. Pendiente: los otros tres integrantes | Captura de la lista de dispositivos MFA (sin IP ni códigos) |
-| Sin llaves de acceso de larga duración (no `AKIA…`) | CA-NF03.2 | [hecho] | `aws iam list-access-keys` vacío |
+| Sin llaves de acceso de larga duración (no `AKIA…`) | CA-NF03.2 | Cumplido en el equipo de DevOps: no existe `~/.aws/credentials`; la sesión de `aws login` es un rol asumido temporal | `aws sts get-caller-identity` → `assumed-role/AccountFullAccessRole` |
 | Credenciales temporales para desplegar (perfil `zerotrust-lab04`) | T029 | Hecho: `aws login` crea una sesión temporal con el rol asumido `AccountFullAccessRole`; no hay llaves de larga duración | `aws sts get-caller-identity` (tapando Account ID) |
 | Sin credenciales AWS en el repo ni en CI | CA-NF03.2 | verificado con secret scanning | Ajustes del repo |
 
@@ -70,22 +70,22 @@ No se usan: MFA por SMS, Cognito Plus ni AWS WAF (la HTTP API no se integra con 
 | Monto | 1,00 USD |
 | Estado al crearlo | ACEPTAR (importe utilizado 0,00 %) |
 | Alertas | [umbrales de la plantilla: confirmar en el detalle del presupuesto] |
-| Destinatarios | [correos del equipo, sin publicarlos] |
-| Creado por | Integrante DevOps, el [fecha], desde Billing and Cost Management del project «Console Dot Dream» |
+| Destinatarios | Correos del equipo (no se publican en el repositorio) |
+| Creado por | Integrante DevOps, el 2026-11-11, desde Billing and Cost Management del project «Console Dot Dream» |
 | Evidencia | Captura de la lista de presupuestos con el aviso «se ha creado correctamente» |
 
-**Nivel gratuito (comprobación del Free plan):** 0 ofertas de servicio en uso y ≈ 140 USD de crédito restante tras crear el presupuesto (la consulta por CLI había dado ≈ 120 USD antes; el aumento probablemente es crédito por completar una actividad del Free plan, [verificar en «Ver detalles»]). Evidencia: captura de la página *Nivel gratuito*.
+**Nivel gratuito (comprobación del Free plan):** 0 ofertas de servicio en uso y ≈ 140 USD de crédito restante tras crear el presupuesto (la consulta por CLI había dado ≈ 120 USD antes; el aumento de ≈ 20 USD coincide con la creación del presupuesto; su origen exacto no está detallado en la consola consultada). Evidencia: captura de la página *Nivel gratuito*.
 
 ## 6. Herramientas locales
 
 | Herramienta | Versión | Comando de verificación |
 |---|---|---|
-| AWS CLI v2 | [x.y.z] | `aws --version` |
-| AWS SAM CLI | [x.y.z] | `sam --version` |
+| AWS CLI v2 | 2.40.0 | `aws --version` |
+| AWS SAM CLI | 1.172.1 | `sam --version` |
 | Node.js | v24 (coincide con `nodejs24.x`) | `node --version` |
-| Docker | [x.y.z] | `docker --version` |
+| Docker | 29.9.2 | `docker --version` |
 
-Evidencia: [captura de las cuatro versiones]. Configuración de credenciales: [describir método usado, **sin pegar llaves**].
+Evidencia: captura de las versiones en el informe técnico. Credenciales: sesión temporal con `aws login --profile zerotrust-lab04` (rol asumido; sin llaves de larga duración y sin archivo `credentials`).
 
 ## 7. Despliegue de la pila base (T029)
 
@@ -106,7 +106,7 @@ sam deploy --template-file infra/template.yaml --stack-name zerotrust-lab04 --re
 | `SpaClientId` / `AdminCliClientId` | `5iln8ismuog3palsrebjptrafe` / `49o5n3koh8udavr44r7hplmpcs` (identificadores públicos, sin secreto) |
 | `CognitoDomainUrl` | `https://zerotrust-lab04-aqp.auth.us-east-2.amazoncognito.com` |
 | Tablas | `zerotrust-lab04-{Projects,Donations,Idempotency,AuditEvents}Table-…` |
-| Evidencia | [captura de la salida de `sam deploy` y de la pila en CloudFormation, tapando el Account ID] |
+| Evidencia | Salida de `sam deploy` y estado de la pila en CloudFormation (sin Account ID) en el informe técnico; auditoría en `evidence/RNF-HU-07-observabilidad.md` §6 |
 
 ### 7.1 Despliegue completo (Lambdas, trigger de MFA, S3 y CloudFront)
 
@@ -126,7 +126,7 @@ CloudFront crea la URL del frontend durante este primer despliegue; esa URL se r
 | Estado de la pila | `UPDATE_COMPLETE` el 2026-11-11 |
 | `WebUrl` | `https://d16kz767amey5o.cloudfront.net` |
 | Verified Permissions | No desplegado (`EnableAvp=false`; extensión HU-12 opcional) |
-| Evidencia | [captura del changeset y de la pila actualizada, tapando el Account ID] |
+| Evidencia | Lista de cambios (changeset) y pila actualizada (sin Account ID) en el informe técnico |
 
 ## 8. Limpieza (T106)
 
