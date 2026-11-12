@@ -1,7 +1,7 @@
 # Cuenta AWS — configuración segura (T009)
 
 > Trazabilidad: CA-NF09.1, CA-NF03.3, CA-NF03.2, RNF-HU-03, RNF-HU-09 · Tarea T009 (y registro de T029)
-> Responsable: Alex (DevOps/AWS) · Última actualización: [fecha]
+> Responsable: integrante con rol DevOps/AWS · Última actualización: [fecha]
 >
 > **Regla de evidencias:** tapar el Account ID, tokens, correos reales y cualquier secreto antes de guardar una captura (ver `evidence/README.md`). Los comandos se muestran sin salida sensible.
 
@@ -11,9 +11,9 @@ El equipo usa **una cuenta AWS en Free plan** (una por equipo, RNF-HU-09). La cu
 
 | Verificación | Cómo | Resultado | Evidencia |
 |---|---|---|---|
-| Plan de cuenta | `aws freetier get-account-plan-state` | `accountPlanType: FREE`, `accountPlanStatus: ACTIVE`; créditos restantes 119.87 USD; vence el 2027-05-05 | `evidence/aws-plan.png` |
-| Dueño de la cuenta | AWS Settings → View all projects | Project «Console Dot Dream»; propietario: Andre Añazco | [captura de la pantalla del project, tapando correos] |
-| Integrantes con acceso | AWS Settings → Miembros | 2 de 4 al [fecha] (Alex y Andre); pendiente invitar a los otros dos | [captura] |
+| Plan de cuenta | `aws freetier get-account-plan-state` | `accountPlanType: FREE`, `accountPlanStatus: ACTIVE`; créditos restantes ≈ 140 USD; vence el 2027-05-05 | `evidence/aws-plan.png` |
+| Dueño de la cuenta | AWS Settings → View all projects | Project «Console Dot Dream»; el propietario figura en AWS Settings (se omite su nombre: el repositorio es público) | [captura de la pantalla del project, tapando nombres y correos] |
+| Integrantes con acceso | AWS Settings → Miembros | 2 de 4 al [fecha]; pendiente invitar a los otros dos integrantes | [captura, tapando nombres y correos] |
 
 ## 2. Región
 
@@ -45,7 +45,7 @@ Antes de desplegar se comprobó que cada servicio está en la lista oficial de s
 | Amazon Verified Permissions | Extensión HU-12 (opcional) | Sí |
 | IAM Access Analyzer | Evidencia de mínimo privilegio (T097) | **Parcial**: solo la validación de políticas está incluida; el análisis de acceso externo no está soportado. Para T10 se usa el IAM Policy Simulator |
 
-Fuente: lista oficial «AWS services included in the Free Tier of our new AWS experience» (docs.aws.amazon.com/accounts/latest/reference/supported-services-sign-up-new.html), consultada el [fecha] por Alex. Evidencia: [captura de la lista].
+Fuente: lista oficial «AWS services included in the Free Tier of our new AWS experience» (docs.aws.amazon.com/accounts/latest/reference/supported-services-sign-up-new.html), consultada el [fecha] por el integrante DevOps. Evidencia: [captura de la lista].
 
 No se usan: MFA por SMS, Cognito Plus ni AWS WAF (la HTTP API no se integra con WAF directamente, `design.md` §6.3). No están soportados en esta experiencia: AWS Verified Access, Amazon GuardDuty, AWS Security Hub, IAM Identity Center, AWS Organizations, AWS Shield; coincide con las limitaciones que declara el diseño. Todas las funciones y recursos se crean en una sola región, porque no se soportan características multirregión.
 
@@ -53,8 +53,8 @@ No se usan: MFA por SMS, Cognito Plus ni AWS WAF (la HTTP API no se integra con 
 
 | Control | Requisito | Estado | Evidencia |
 |---|---|---|---|
-| MFA del propietario del project (Andre) y sin uso de la cuenta raíz | CA-NF03.3 | [pendiente de confirmar con Andre] | [captura de Andre] |
-| Cada integrante con acceso propio y **MFA** | CA-NF03.3 | Alex: hecho el 11-nov-2026, dispositivo TOTP `alex-telefono` en AWS Builder ID → Seguridad. Pendiente: Andre, César y Paul | Captura de la lista de dispositivos MFA (sin IP ni códigos) |
+| MFA del propietario del project y sin uso de la cuenta raíz | CA-NF03.3 | [pendiente de confirmar con el propietario] | [captura del propietario, sin datos personales] |
+| Cada integrante con acceso propio y **MFA** | CA-NF03.3 | Integrante DevOps: hecho el 11-nov-2026, dispositivo TOTP en AWS Builder ID → Seguridad. Pendiente: los otros tres integrantes | Captura de la lista de dispositivos MFA (sin IP ni códigos) |
 | Sin llaves de acceso de larga duración (no `AKIA…`) | CA-NF03.2 | [hecho] | `aws iam list-access-keys` vacío |
 | Credenciales temporales para desplegar (perfil `zerotrust-lab04`) | T029 | Hecho: `aws login` crea una sesión temporal con el rol asumido `AccountFullAccessRole`; no hay llaves de larga duración | `aws sts get-caller-identity` (tapando Account ID) |
 | Sin credenciales AWS en el repo ni en CI | CA-NF03.2 | verificado con secret scanning | Ajustes del repo |
@@ -71,10 +71,10 @@ No se usan: MFA por SMS, Cognito Plus ni AWS WAF (la HTTP API no se integra con 
 | Estado al crearlo | ACEPTAR (importe utilizado 0,00 %) |
 | Alertas | [umbrales de la plantilla: confirmar en el detalle del presupuesto] |
 | Destinatarios | [correos del equipo, sin publicarlos] |
-| Creado por | Alex, el [fecha], desde Billing and Cost Management del project «Console Dot Dream» |
+| Creado por | Integrante DevOps, el [fecha], desde Billing and Cost Management del project «Console Dot Dream» |
 | Evidencia | Captura de la lista de presupuestos con el aviso «se ha creado correctamente» |
 
-**Nivel gratuito (comprobación del Free plan):** 0 ofertas de servicio en uso y 139,87 USD de crédito restante tras crear el presupuesto (la consulta por CLI había dado 119,87 USD antes; el aumento probablemente es crédito por completar una actividad del Free plan, [verificar en «Ver detalles»]). Evidencia: captura de la página *Nivel gratuito*.
+**Nivel gratuito (comprobación del Free plan):** 0 ofertas de servicio en uso y ≈ 140 USD de crédito restante tras crear el presupuesto (la consulta por CLI había dado ≈ 120 USD antes; el aumento probablemente es crédito por completar una actividad del Free plan, [verificar en «Ver detalles»]). Evidencia: captura de la página *Nivel gratuito*.
 
 ## 6. Herramientas locales
 
