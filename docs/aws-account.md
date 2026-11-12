@@ -91,16 +91,22 @@ Evidencia: [captura de las cuatro versiones]. Configuración de credenciales: [d
 
 ```bash
 sam validate --lint --template-file infra/template.yaml --region us-east-2
-sam build --template-file infra/template.yaml
-sam deploy --region us-east-2 --profile zerotrust-lab04
+sam deploy --template-file infra/template.yaml --stack-name zerotrust-lab04 --region us-east-2 --profile zerotrust-lab04 --resolve-s3 --capabilities CAPABILITY_IAM --parameter-overrides Stage=academic --confirm-changeset
 ```
+
+(`sam build` no se necesita todavía: la pila base no tiene funciones Lambda. Se añade con T027 y T042.)
 
 | Resultado | Valor |
 |---|---|
-| Estado de la pila | [CREATE_COMPLETE] |
+| Estado de la pila | `CREATE_COMPLETE` el 2026-11-11 (segundo intento; el primero está en §9) |
 | Región | us-east-2 |
-| Outputs (sin Account ID) | [API URL, User Pool ID, Client IDs, dominio de Cognito] |
-| Evidencia | [captura de CloudFormation y de los outputs] |
+| Recursos creados | 15: 4 tablas DynamoDB, user pool, 3 grupos, resource server, 2 clientes, dominio, grupo de logs y HTTP API con su stage `academic` |
+| `ApiUrl` | `https://f0yj0946gl.execute-api.us-east-2.amazonaws.com/academic` |
+| `UserPoolId` | `us-east-2_boFX29iKQ` |
+| `SpaClientId` / `AdminCliClientId` | `5iln8ismuog3palsrebjptrafe` / `49o5n3koh8udavr44r7hplmpcs` (identificadores públicos, sin secreto) |
+| `CognitoDomainUrl` | `https://zerotrust-lab04-aqp.auth.us-east-2.amazoncognito.com` |
+| Tablas | `zerotrust-lab04-{Projects,Donations,Idempotency,AuditEvents}Table-…` |
+| Evidencia | [captura de la salida de `sam deploy` y de la pila en CloudFormation, tapando el Account ID] |
 
 ## 8. Limpieza (T106)
 
