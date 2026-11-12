@@ -61,9 +61,33 @@ Se leyeron las políticas en línea de los **7 roles** (`scripts/simulate-t10.ps
 - **Comodín parcial en los logs:** el `:*` al final del ARN de cada grupo de logs es el sufijo de los flujos de logs de **ese** grupo, no un comodín sobre otros recursos.
 - **Política del bucket del frontend:** incluye un `Deny` con `s3:*` para peticiones sin TLS (`aws:SecureTransport = false`), una restricción, no un permiso; el único `Allow` es `s3:GetObject` para CloudFront (OAC).
 
-## Limitación: IAM Access Analyzer
+## Validación de políticas con IAM Access Analyzer (T097)
 
-`tests/manual/T10-minimo-privilegio.md` pide revisar los roles con IAM Access Analyzer. En esta cuenta **solo la validación de políticas está incluida** en el Free plan; el análisis de acceso externo no está soportado (`docs/aws-account.md` §3). Por eso la evidencia usa el simulador y la lectura directa de las políticas.
+`tests/manual/T10-minimo-privilegio.md` pide revisar los roles con IAM Access Analyzer. En esta cuenta **solo la validación de políticas está incluida** en el Free plan; el análisis de acceso externo (analizadores de acceso) no está soportado (`docs/aws-account.md` §3). Se usó la validación, que evalúa cada documento de política sin tocar ningún recurso:
+
+```bash
+aws accessanalyzer validate-policy --policy-type IDENTITY_POLICY --policy-document file://<politica>.json
+```
+
+Se validaron las **14 políticas en línea de los 7 roles** de la pila (se obtuvieron con `aws iam get-role-policy`):
+
+| Rol | Políticas validadas | Hallazgos (errores, avisos de seguridad, advertencias, sugerencias) |
+|---|---|---|
+| `PublicProjectsRole` | `logs`, `projects-read` | 0 |
+| `ManageProjectsRole` | `logs`, `projects-write` | 0 |
+| `CreateDonationRole` | `logs`, `donations-create` | 0 |
+| `SimulateDonationRole` | `logs`, `donations-simulate` | 0 |
+| `ReadDonationsRole` | `logs`, `donations-read` | 0 |
+| `AuditRole` | `logs`, `audit-read` | 0 |
+| `PreAuthRole` | `logs`, `cognito-read` | 0 |
+
+**Resultado: 14 políticas validadas, 0 hallazgos.**
+
+Alcance y límites de esta comprobación:
+
+- Valida la **sintaxis y las buenas prácticas** de las políticas de identidad; no sustituye la simulación de la sección anterior ni el análisis de acceso externo, que no está disponible.
+- No incluye las políticas de confianza (quién puede asumir cada rol): todas permiten únicamente al servicio `lambda.amazonaws.com`.
+- La excepción `userpool/*` de `PreAuthRole` está documentada y justificada arriba; el validador no la marca.
 
 ## Pruebas automáticas relacionadas
 

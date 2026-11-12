@@ -11,7 +11,7 @@
 
 ## Resultado
 
-**Aprobada** en los puntos 1, 2, 3 y 5. El punto 4 (DevTools) queda pendiente de captura.
+**Aprobada** en los 5 puntos.
 
 ## 1. HTTP redirige a HTTPS (CA-NF01.1)
 
@@ -60,7 +60,7 @@ codigo=000 exit=7
 Con la SPA abierta, DevTools → *Application*, para el origen `https://d16kz767amey5o.cloudfront.net`:
 
 - `Session Storage` → **vacío** (solo debería tener claves `oidc.pkce.*` durante la redirección de Cognito; se borran al volver). Captura: `evidence/img/CA-NF11-storage.png`.
-- `Local Storage` → debe estar **sin tokens**. *[Pendiente: captura adicional con la sesión iniciada, `evidence/img/CA-NF11-localstorage.png`.]*
+- `Local Storage` → **sin tokens**. Captura: `evidence/img/CA-NF11-localstorage.png`.
 
 Los tokens viven solo en memoria de la aplicación (`oidc-client-ts` con `InMemoryWebStorage`, `research.md` R-04), por lo que recargar la página cierra la sesión local.
 
