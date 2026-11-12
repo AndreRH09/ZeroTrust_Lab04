@@ -1,9 +1,70 @@
 @import "tailwindcss";
 
-/* Foco visible en todos los controles (WCAG 2.2 · 2.4.7 / 2.4.11, CA-NF06.2). */
+/*
+ * Sistema visual AQP-SOLIDARIA: verde azulado institucional (confianza) + coral (acción de donar,
+ * único punto focal) sobre arena cálida (sillar de Arequipa). Sin fuentes ni imágenes externas:
+ * la CSP de CloudFront solo permite recursos 'self' (CA-NF11.2).
+ */
+@theme {
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --color-brand-50: #eef9f7;
+  --color-brand-100: #d5f0eb;
+  --color-brand-200: #abe0d7;
+  --color-brand-300: #77c8bc;
+  --color-brand-400: #46ab9e;
+  --color-brand-500: #2b8f83;
+  --color-brand-600: #20736a;
+  --color-brand-700: #1c5c56;
+  --color-brand-800: #1a4a46;
+  --color-brand-900: #183e3b;
+  --color-brand-950: #0a2422;
+
+  --color-coral-50: #fdf3ef;
+  --color-coral-100: #fbe3d9;
+  --color-coral-200: #f6c3ae;
+  --color-coral-300: #ef9b7b;
+  --color-coral-500: #df5f37;
+  --color-coral-600: #c54b25;
+  --color-coral-700: #a43b1d;
+  --color-coral-800: #86321c;
+
+  --color-sand-50: #fbf9f6;
+  --color-sand-100: #f5f0e9;
+  --color-sand-200: #e9e1d5;
+  --color-sand-300: #d8cbb8;
+}
+
 @layer base {
+  :root {
+    --focus-ring: var(--color-brand-800);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* Foco visible con contraste ≥ 3:1 en todos los controles (WCAG 2.2 · 2.4.7 / 2.4.11). */
   :focus-visible {
-    outline: 3px solid var(--color-amber-500);
+    outline: 3px solid var(--focus-ring);
     outline-offset: 2px;
+  }
+
+  /* Los enlaces de anclaje no deben quedar tapados por la cabecera fija. */
+  [id] {
+    scroll-margin-top: 6rem;
   }
 }

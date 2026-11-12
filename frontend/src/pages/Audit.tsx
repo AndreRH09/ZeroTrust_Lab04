@@ -3,8 +3,20 @@ import { AuditEventType } from "@aqp/shared";
 import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { useAuth } from "../auth/useAuth";
-import { btnPrimary, Empty, ErrorMessage, input, Loading } from "../components/States";
+import { EyeIcon, SearchIcon } from "../components/Icons";
+import {
+  Badge,
+  btnPrimary,
+  card,
+  Empty,
+  ErrorMessage,
+  input,
+  labelCls,
+  Loading,
+  PageHeader,
+} from "../components/States";
 import { api } from "../services/api";
+import { AUDIT_EVENT_LABEL, AUDIT_OUTCOME } from "./statusLabels";
 
 const toIso = (local: string) => (local ? new Date(local).toISOString() : undefined);
 
@@ -32,17 +44,22 @@ export function Audit() {
   };
 
   return (
-    <section aria-labelledby="titulo-auditoria" className="space-y-4">
-      <h1 id="titulo-auditoria" className="text-2xl font-bold">
-        Eventos de auditoría
-      </h1>
+    <section aria-labelledby="titulo-auditoria" className="space-y-8">
+      <PageHeader
+        id="titulo-auditoria"
+        eyebrow="Panel del auditor"
+        title="Eventos de auditoría"
+        description="Los actores aparecen con seudónimo; nunca se muestran tokens, correos ni identificadores reales."
+      />
+
       <form
         onSubmit={onSubmit}
-        className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-4"
+        aria-label="Filtros de auditoría"
+        className={`${card} grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_auto]`}
       >
         <div>
-          <label htmlFor="eventType" className="block text-sm font-medium">
-            Tipo
+          <label htmlFor="eventType" className={labelCls}>
+            Tipo de evento
           </label>
           <select
             id="eventType"
@@ -52,13 +69,13 @@ export function Audit() {
           >
             {AuditEventType.options.map((t) => (
               <option key={t} value={t}>
-                {t}
+                {AUDIT_EVENT_LABEL[t]} ({t})
               </option>
             ))}
           </select>
         </div>
         <div>
-          <label htmlFor="from" className="block text-sm font-medium">
+          <label htmlFor="from" className={labelCls}>
             Desde
           </label>
           <input
@@ -70,7 +87,7 @@ export function Audit() {
           />
         </div>
         <div>
-          <label htmlFor="to" className="block text-sm font-medium">
+          <label htmlFor="to" className={labelCls}>
             Hasta
           </label>
           <input
@@ -82,7 +99,8 @@ export function Audit() {
           />
         </div>
         <div className="flex items-end">
-          <button type="submit" className={btnPrimary}>
+          <button type="submit" className={`${btnPrimary} w-full`}>
+            <SearchIcon className="size-4" />
             Filtrar
           </button>
         </div>
@@ -93,48 +111,64 @@ export function Audit() {
       ) : events.error ? (
         <ErrorMessage error={events.error} />
       ) : events.data.items.length === 0 ? (
-        <Empty title="Sin eventos para el filtro seleccionado" />
+        <Empty
+          title="Sin eventos para el filtro seleccionado"
+          icon={<EyeIcon className="size-6" />}
+        >
+          Prueba con otro tipo de evento o amplía el rango de fechas.
+        </Empty>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-          <table className="w-full text-left text-sm">
-            <caption className="sr-only">Eventos de auditoría</caption>
-            <thead className="bg-slate-50 text-slate-600">
-              <tr>
-                <th scope="col" className="px-3 py-2">
-                  Fecha
-                </th>
-                <th scope="col" className="px-3 py-2">
-                  Acción
-                </th>
-                <th scope="col" className="px-3 py-2">
-                  Recurso
-                </th>
-                <th scope="col" className="px-3 py-2">
-                  Resultado
-                </th>
-                <th scope="col" className="px-3 py-2">
-                  Actor (seudónimo)
-                </th>
-                <th scope="col" className="px-3 py-2">
-                  requestId
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.data.items.map((ev) => (
-                <tr key={ev.eventId} className="border-t border-slate-100 align-top">
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {new Date(ev.timestamp).toLocaleString("es-PE")}
-                  </td>
-                  <td className="px-3 py-2">{ev.action}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{ev.resourceRef}</td>
-                  <td className="px-3 py-2">{ev.outcome}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{ev.actorRef.slice(0, 12)}…</td>
-                  <td className="px-3 py-2 font-mono text-xs">{ev.requestId}</td>
+        <div className="space-y-3">
+          <p aria-live="polite" className="text-sm text-stone-500">
+            {events.data.items.length} evento(s) · {AUDIT_EVENT_LABEL[filter.eventType]}
+          </p>
+          <div className={`${card} overflow-x-auto`}>
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only">Eventos de auditoría</caption>
+              <thead className="border-b border-sand-200 bg-sand-50 text-xs font-semibold tracking-wide text-stone-600 uppercase">
+                <tr>
+                  <th scope="col" className="px-4 py-3">
+                    Fecha
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Acción
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Recurso
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Resultado
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Actor (seudónimo)
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    requestId
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-sand-100">
+                {events.data.items.map((ev) => (
+                  <tr key={ev.eventId} className="align-top hover:bg-sand-50">
+                    <td className="px-4 py-3 whitespace-nowrap text-stone-700">
+                      {new Date(ev.timestamp).toLocaleString("es-PE")}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-stone-900">{ev.action}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-stone-700">{ev.resourceRef}</td>
+                    <td className="px-4 py-3">
+                      <Badge tone={AUDIT_OUTCOME[ev.outcome].tone}>
+                        {AUDIT_OUTCOME[ev.outcome].label}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-stone-700">
+                      {ev.actorRef.slice(0, 12)}…
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-stone-500">{ev.requestId}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </section>
