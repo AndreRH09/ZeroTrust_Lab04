@@ -2,7 +2,9 @@
 
 Todo cambio asistido por IA entra por PR y debe ser revisado por un integrante distinto de quien lo
 generó. No se compartieron con los asistentes credenciales AWS, tokens, `.env` ni datos personales
-reales, y ningún agente ejecutó despliegues sobre la cuenta AWS.
+reales, y ningún agente ejecutó despliegues sobre la cuenta AWS. Las consultas de solo lectura que un
+asistente ejecutó con la sesión temporal de un integrante, siempre con su aprobación, se declaran en
+la segunda tabla.
 
 | Campo | Contenido |
 |---|---|
@@ -12,3 +14,15 @@ reales, y ningún agente ejecutó despliegues sobre la cuenta AWS.
 | Aportes IA | Código y pruebas en `shared/`, `backend/`, `frontend/`, `infra/test/`, `policies/`, `tests/`, `scripts/`; documentos `README.md`, `docs/threat-model.md`, `docs/test-users.md`, `tests/manual/*`. PR: rama `feat/mvp-backend-frontend` |
 | Validación humana | Pendiente: revisión del PR por otro integrante, despliegue en el stage `academic` y ejecución de T01–T14 con evidencia en `evidence/`. Verificado localmente: lint, formato, typecheck, 300+ pruebas automáticas, `cfn-lint` sin hallazgos y build de Lambdas y SPA |
 | Limitaciones | No se desplegó en AWS desde el asistente: el comportamiento real de Cognito (managed login, trigger Pre authentication, revocación), CloudFront/CSP y la colección Bruno no se han ejecutado contra la cuenta. Las políticas Cedar se probaron con un evaluador simulado, no contra Verified Permissions. Las decisiones de IAM (`userpool/*` en `PreAuthFn`) y de seguridad deben ser revisadas y explicadas por el equipo |
+
+## Cuenta AWS, despliegue y evidencias (integrante DevOps/AWS)
+
+| Campo | Contenido |
+|---|---|
+| Herramienta/modelo | Claude (Anthropic), Claude Sonnet 5.5 mediante Claude Code (aplicación de escritorio) |
+| Participantes | Alex (integrante DevOps/AWS) |
+| Tareas asistidas | T009 (`docs/aws-account.md`: plan Free, región, Budgets, MFA, servicios del Free plan); T025, T026 y T028 (tablas DynamoDB, Cognito y HTTP API en `infra/template.yaml`); T029 (despliegue de la pila); T030 (`scripts/create-test-user.ps1`, usuarios de prueba y TOTP); T094/T095 (arreglo de `scripts/deploy-web.sh`); evidencias T10, T14, T96 y T100 (`evidence/`, `scripts/simulate-t10.ps1`); revisión de los roles IAM de la plantilla ampliada |
+| Aportes IA | `infra/template.yaml` (secciones base y corrección de CORS), `scripts/create-test-user.ps1`, `scripts/simulate-t10.ps1`, `docs/aws-account.md`, variante PowerShell de `docs/test-users.md`, `evidence/T10-*.md`, `evidence/T14-*.md`, `evidence/CA-NF11-cabeceras.md`, `evidence/RNF-HU-07-observabilidad.md`. PR: #4, #6 y #8 |
+| Validación humana | El integrante ejecutó personalmente todos los comandos que crean o modifican recursos: `sam deploy` (5 ejecuciones: 1 fallida y revertida, 4 completadas), revisando la lista de cambios (`--confirm-changeset`) antes de confirmar y comprobando que no hubiera `Remove` ni reemplazos; `aws login`, creación de usuarios de prueba y enrolamiento de TOTP con su propia app autenticadora; capturas de las evidencias. Verificado con `sam validate --lint`, las pruebas automáticas del repositorio (324 pasan), la simulación de IAM y la revisión de los 7 roles. El PR #4 fue revisado y aprobado por otro integrante |
+| Consultas de solo lectura del asistente | Con aprobación del integrante y su sesión temporal (`aws login`, sin llaves de larga duración), el asistente ejecutó consultas de solo lectura: `sts get-caller-identity`, `cloudformation describe-*`, `cognito-idp admin-get-user`, `iam simulate-principal-policy`, `apigatewayv2 get-*`, `logs get-log-events` y `cloudtrail lookup-events`. No recibió contraseñas, secretos TOTP ni tokens, y no ejecutó `sam deploy` ni comandos que creen o borren recursos |
+| Limitaciones y errores del asistente | (1) Propuso `ExplicitAuthFlows: [ALLOW_REFRESH_TOKEN_AUTH]` junto con la rotación del refresh token; Cognito lo rechazó en el primer despliegue (`docs/aws-account.md` §9). (2) Usó `!If` dentro de `AllowOrigins`: SAM generó un bloque CORS inválido y la API quedó con `cors = null`; solo se detectó en el navegador y se corrigió con el traductor local de SAM. (3) Una primera búsqueda de datos sensibles en los logs devolvió «ninguna coincidencia» sin haber revisado eventos (paginación del CLI); se rehízo contando los eventos revisados. (4) La simulación de IAM sin datos de contexto devolvió `explicitDeny` por las SCP administradas de la cuenta; se resolvió pasando región y TLS. (5) Una afirmación sin verificar, el origen del aumento de créditos, está marcada como `[verificar]`. Las decisiones de IAM y de seguridad deben ser explicadas por el integrante en la sustentación |
