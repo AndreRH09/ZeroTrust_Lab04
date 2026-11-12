@@ -1,0 +1,30 @@
+# Smoke test del despliegue en AWS: comprueba que web, API y Cognito responden y que los
+# controles de seguridad visibles desde fuera (CSP, cabeceras, 401 sin token, CORS, callbacks)
+# siguen activos. Solo HTTP público: sin credenciales AWS ni secretos (CA-NF03.2).
+# Las URLs son públicas; si cambia la pila, actualizarlas en Settings → Variables (Actions).
+name: Smoke despliegue
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths: [scripts/smoke-deploy.sh, .github/workflows/smoke-deploy.yml]
+  schedule:
+    - cron: "0 13 * * *" # 08:00 en Perú
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      WEB_URL: ${{ vars.WEB_URL || 'https://d16kz767amey5o.cloudfront.net' }}
+      API_URL: ${{ vars.API_URL || 'https://f0yj0946gl.execute-api.us-east-2.amazonaws.com/academic' }}
+      COGNITO_DOMAIN: ${{ vars.COGNITO_DOMAIN || 'https://zerotrust-lab04-aqp.auth.us-east-2.amazoncognito.com' }}
+      SPA_CLIENT_ID: ${{ vars.SPA_CLIENT_ID || '5iln8ismuog3palsrebjptrafe' }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/smoke-deploy.sh
