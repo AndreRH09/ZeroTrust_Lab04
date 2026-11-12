@@ -30,18 +30,24 @@ Antes de desplegar se comprobó que cada servicio está en la lista oficial de s
 
 | Servicio | Uso en el proyecto | ¿En el Free plan? |
 |---|---|---|
-| AWS Lambda | Backend (6 funciones + `PreAuthFn`) | [sí/no] |
-| Amazon API Gateway (HTTP API) | Punto de entrada y JWT authorizer | [sí/no] |
-| Amazon DynamoDB | Proyectos, donaciones, idempotencia, auditoría | [sí/no] |
-| Amazon Cognito | Identidad, grupos, MFA TOTP | [sí/no] |
-| Amazon S3 + CloudFront | Frontend (bucket privado + OAC) | [sí/no] |
-| Amazon CloudWatch Logs | Logs JSON, retención 14 días | [sí/no] |
-| AWS CloudTrail | Auditoría de infraestructura | [sí/no] |
-| AWS CloudFormation / SAM | IaC | [sí/no] |
-| AWS Budgets | Alerta de costo | [sí/no] |
-| Amazon Verified Permissions | Extensión HU-12 (opcional) | [sí/no] |
+| AWS Lambda | Backend (6 funciones + `PreAuthFn`) | Sí (Lambda@Edge no soportado; no se usa) |
+| Amazon API Gateway (HTTP API) | Punto de entrada y JWT authorizer | Sí |
+| Amazon DynamoDB | Proyectos, donaciones, idempotencia, auditoría | Sí |
+| Amazon Cognito | Identidad, grupos, MFA TOTP | Sí |
+| Amazon S3 | Bucket privado del frontend | Sí (S3 Access Grants no soportado; no se usa) |
+| Amazon CloudFront | CDN con OAC y cabeceras de seguridad | Sí (Lambda@Edge no soportado; no se usa) |
+| Amazon CloudWatch / CloudWatch Logs | Logs JSON, retención 14 días | Sí |
+| AWS CloudTrail | Auditoría de infraestructura | Sí |
+| AWS CloudFormation / SAM | IaC | Sí |
+| AWS IAM / AWS STS | Roles por función; sesión temporal de `aws login` | Sí |
+| AWS Budgets / Billing and Cost Management / Cost Explorer | Alerta de costo y consumo | Sí |
+| AWS Systems Manager, AWS CloudShell | Apoyo operativo (CloudShell opcional para desplegar) | Sí |
+| Amazon Verified Permissions | Extensión HU-12 (opcional) | Sí |
+| IAM Access Analyzer | Evidencia de mínimo privilegio (T097) | **Parcial**: solo la validación de políticas está incluida; el análisis de acceso externo no está soportado. Para T10 se usa el IAM Policy Simulator |
 
-No se usan: MFA por SMS, Cognito Plus, AWS WAF, Verified Access, GuardDuty ni Security Hub.
+Fuente: lista oficial «AWS services included in the Free Tier of our new AWS experience» (docs.aws.amazon.com/accounts/latest/reference/supported-services-sign-up-new.html), consultada el [fecha] por Alex. Evidencia: [captura de la lista].
+
+No se usan: MFA por SMS, Cognito Plus ni AWS WAF (la HTTP API no se integra con WAF directamente, `design.md` §6.3). No están soportados en esta experiencia: AWS Verified Access, Amazon GuardDuty, AWS Security Hub, IAM Identity Center, AWS Organizations, AWS Shield; coincide con las limitaciones que declara el diseño. Todas las funciones y recursos se crean en una sola región, porque no se soportan características multirregión.
 
 ## 4. Seguridad de la cuenta
 
@@ -104,4 +110,5 @@ El procedimiento y su verificación se documentan en `evidence/RNF-HU-09-limpiez
 
 | Fecha | Incidencia o decisión | Causa | Acción |
 |---|---|---|---|
-| [fecha] | [descripción] | [causa] | [solución] |
+| 2026-11-11 | Primer `sam deploy` de la pila `zerotrust-lab04` falló y la pila quedó en `ROLLBACK_COMPLETE` | `SpaClient` declaraba `ExplicitAuthFlows: [ALLOW_REFRESH_TOKEN_AUTH]` junto con `RefreshTokenRotation`; Cognito responde «ALLOW_REFRESH_TOKEN_AUTH is not a permitted ExplicitAuthFlow when refresh token rotation is enabled». `sam validate --lint` no lo detecta porque la validación ocurre en el servicio | Cambiar a `ExplicitAuthFlows: [ALLOW_USER_SRP_AUTH]` (el refresco usa el grant `refresh_token` del flujo OAuth), eliminar la pila fallida y volver a desplegar |
+| 2026-11-11 | `sam deploy --resolve-s3` creó el bucket gestionado `aws-sam-cli-managed-default-samclisourcebucket-…` | Comportamiento normal de SAM: guarda los artefactos de despliegue en una pila propia (`aws-sam-cli-managed-default`) | Incluirlo en la limpieza final (T106): `sam delete` no elimina esa pila; hay que vaciar el bucket y borrar la pila a mano |
