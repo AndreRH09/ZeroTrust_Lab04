@@ -2,17 +2,12 @@ AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >-
   Plataforma de Donaciones Seguras (Fundación AQP-SOLIDARIA) - prototipo académico Zero Trust.
-  Pila base: DynamoDB (T025) y Cognito (T026). Las funciones Lambda, la HTTP API y el frontend
-  se añaden en tareas posteriores (T027, T028, T042 y siguientes, T094).
+  DynamoDB, Cognito (MFA TOTP + trigger Pre authentication), HTTP API con JWT authorizer,
+  una función Lambda por caso de uso con rol IAM propio, S3 privado + CloudFront (OAC + cabeceras
+  de seguridad) y, opcionalmente, Amazon Verified Permissions (HU-12).
 
 # Trazabilidad: RNF-HU-02, RNF-HU-03, RNF-HU-04, CA-03.1, CA-03.3, CA-11.1, CA-NF02.1, CA-NF08.2
 # Región objetivo: us-east-2 (research R-01). Sin Account ID ni secretos en este archivo.
-
-Metadata:
-  cfn-lint:
-    config:
-      # W8001: la condición IsAcademic la usa la ruta de simulación (T079), aún no añadida.
-      ignore_checks: [W8001]
 
 Parameters:
   Stage:
@@ -33,11 +28,20 @@ Parameters:
     Default: ""
     Description: >-
       Origen HTTPS del frontend (por ejemplo https://dxxxx.cloudfront.net). Vacío hasta T094; con
-      valor, se añade a las URLs de retorno de Cognito.
+      valor, se añade a las URLs de retorno de Cognito y a CORS. scripts/deploy-api.sh lo
+      completa automáticamente con la URL de CloudFront en un segundo despliegue.
+  EnableAvp:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      Extensión HU-12. "true" crea un policy store de Verified Permissions con las políticas Cedar y
+      cambia AUTHZ_ENGINE a avp en las funciones protegidas.
 
 Conditions:
   IsAcademic: !Equals [!Ref Stage, academic]
   HasWebOrigin: !Not [!Equals [!Ref WebOrigin, ""]]
+  UseAvp: !Equals [!Ref EnableAvp, "true"]
 
 Globals:
   Function:
@@ -52,6 +56,8 @@ Globals:
         DONATIONS_TABLE: !Ref DonationsTable
         IDEMPOTENCY_TABLE: !Ref IdempotencyTable
         AUDIT_TABLE: !Ref AuditEventsTable
+        AUTHZ_ENGINE: !If [UseAvp, avp, embedded]
+        AVP_POLICY_STORE_ID: !If [UseAvp, !Ref AvpPolicyStore, ""]
 
 Resources:
   # ---------------------------------------------------------------------------
@@ -148,7 +154,8 @@ Resources:
           - { Name: verified_email, Priority: 1 }
       Schema:
         - { Name: email, AttributeDataType: String, Required: true, Mutable: true }
-      # T027 añadirá LambdaConfig.PreAuthentication apuntando a PreAuthFn.
+      LambdaConfig:
+        PreAuthentication: !GetAtt PreAuthFn.Arn # T027: bloquea GESTOR/AUDITOR sin TOTP
 
   GroupDonante:
     Type: AWS::Cognito::UserPoolGroup
@@ -283,6 +290,663 @@ Resources:
         Format: >-
           {"requestId":"$context.requestId","routeKey":"$context.routeKey","status":"$context.status","responseLength":"$context.responseLength","responseLatency":"$context.responseLatency","integrationLatency":"$context.integrationLatency","authorizerError":"$context.authorizer.error"}
 
+  # ---------------------------------------------------------------------------
+  # T027 - Trigger Pre authentication (research R-02)
+  # Excepción IAM justificada: el ARN del user pool no puede referenciarse en la política del
+  # trigger sin dependencia circular (pool → trigger → rol → pool), por eso el recurso es
+  # userpool/* limitado a la cuenta y región, y solo con dos acciones de lectura.
+  # ---------------------------------------------------------------------------
+  PreAuthLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 14
+
+  PreAuthRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt PreAuthLogGroup.Arn
+        - PolicyName: cognito-read
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [cognito-idp:AdminGetUser, cognito-idp:AdminListGroupsForUser]
+                Resource: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*"
+
+  PreAuthFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Pre authentication - MFA TOTP obligatorio para GESTOR y AUDITOR (CA-11.2)
+      CodeUri: ../backend/dist/preAuth
+      Handler: index.handler
+      Role: !GetAtt PreAuthRole.Arn
+      LoggingConfig: { LogGroup: !Ref PreAuthLogGroup }
+
+  PreAuthInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt PreAuthFn.Arn
+      Principal: cognito-idp.amazonaws.com
+      SourceArn: !GetAtt UserPool.Arn
+
+  # ---------------------------------------------------------------------------
+  # Funciones de la API (research R-05). Cada una con rol propio, solo las acciones DynamoDB y
+  # ARN de tabla/índice que necesita (CA-NF03.1, T10) y log group con retención 14 días.
+  # Las rutas protegidas exigen JwtAuthorizer + scope (PEP); grupo y propietario se validan en
+  # Lambda (PE).
+  # ---------------------------------------------------------------------------
+
+  # T042, T046, T055 - lectura pública (no puede escribir: T10)
+  PublicProjectsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 14
+
+  PublicProjectsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt PublicProjectsLogGroup.Arn
+        - PolicyName: projects-read
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem]
+                Resource: !GetAtt ProjectsTable.Arn
+              - Effect: Allow
+                Action: [dynamodb:Query]
+                Resource: !Sub "${ProjectsTable.Arn}/index/status-createdAt"
+
+  PublicProjectsFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Catálogo, detalle e indicadores públicos (HU-01, HU-02, HU-09)
+      CodeUri: ../backend/dist/publicProjects
+      Handler: index.handler
+      Role: !GetAtt PublicProjectsRole.Arn
+      LoggingConfig: { LogGroup: !Ref PublicProjectsLogGroup }
+      Events:
+        List:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: GET
+            Path: /v1/projects
+        Detail:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: GET
+            Path: /v1/projects/{projectId}
+        Stats:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: GET
+            Path: /v1/projects/{projectId}/stats
+
+  # T051 - gestión de proyectos (GESTOR)
+  ManageProjectsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 14
+
+  ManageProjectsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt ManageProjectsLogGroup.Arn
+        - PolicyName: projects-write
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:UpdateItem]
+                Resource: !GetAtt ProjectsTable.Arn
+              - Effect: Allow
+                Action: [dynamodb:Query]
+                Resource: !Sub "${ProjectsTable.Arn}/index/status-createdAt"
+              - Effect: Allow
+                Action: [dynamodb:PutItem]
+                Resource: !GetAtt AuditEventsTable.Arn
+        - !If
+          - UseAvp
+          - PolicyName: avp
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: [verifiedpermissions:IsAuthorized]
+                  Resource: !GetAtt AvpPolicyStore.Arn
+          - !Ref AWS::NoValue
+
+  ManageProjectsFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Crear, editar y publicar proyectos (HU-08)
+      CodeUri: ../backend/dist/manageProjects
+      Handler: index.handler
+      Role: !GetAtt ManageProjectsRole.Arn
+      LoggingConfig: { LogGroup: !Ref ManageProjectsLogGroup }
+      Events:
+        ListManage:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: GET
+            Path: /v1/manage/projects
+            Auth: { Authorizer: JwtAuthorizer, AuthorizationScopes: [api/projects.write] }
+        Create:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: POST
+            Path: /v1/projects
+            Auth: { Authorizer: JwtAuthorizer, AuthorizationScopes: [api/projects.write] }
+        Update:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: PATCH
+            Path: /v1/projects/{projectId}
+            Auth: { Authorizer: JwtAuthorizer, AuthorizationScopes: [api/projects.write] }
+        Publish:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: PATCH
+            Path: /v1/projects/{projectId}/publish
+            Auth: { Authorizer: JwtAuthorizer, AuthorizationScopes: [api/projects.write] }
+
+  # T063 - intención de donación
+  CreateDonationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 14
+
+  CreateDonationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt CreateDonationLogGroup.Arn
+        - PolicyName: donations-create
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:ConditionCheckItem]
+                Resource: !GetAtt ProjectsTable.Arn
+              - Effect: Allow
+                Action: [dynamodb:PutItem]
+                Resource: !GetAtt DonationsTable.Arn
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem]
+                Resource: !GetAtt IdempotencyTable.Arn
+              - Effect: Allow
+                Action: [dynamodb:PutItem]
+                Resource: !GetAtt AuditEventsTable.Arn
+        - !If
+          - UseAvp
+          - PolicyName: avp
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: [verifiedpermissions:IsAuthorized]
+                  Resource: !GetAtt AvpPolicyStore.Arn
+          - !Ref AWS::NoValue
+
+  CreateDonationFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Intención de donación idempotente (HU-05)
+      CodeUri: ../backend/dist/createDonation
+      Handler: index.handler
+      Role: !GetAtt CreateDonationRole.Arn
+      LoggingConfig: { LogGroup: !Ref CreateDonationLogGroup }
+      Events:
+        Create:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: POST
+            Path: /v1/donations
+            Auth: { Authorizer: JwtAuthorizer, AuthorizationScopes: [api/donations.write] }
+
+  # T079 - simulación: solo existe en el stage academic (CA-06.1)
+  SimulateDonationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: IsAcademic
+    Properties:
+      RetentionInDays: 14
+
+  SimulateDonationRole:
+    Type: AWS::IAM::Role
+    Condition: IsAcademic
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt SimulateDonationLogGroup.Arn
+        - PolicyName: donations-simulate
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:UpdateItem]
+                Resource: !GetAtt DonationsTable.Arn
+              - Effect: Allow
+                Action: [dynamodb:UpdateItem]
+                Resource: !GetAtt ProjectsTable.Arn
+              - Effect: Allow
+                Action: [dynamodb:PutItem]
+                Resource: !GetAtt AuditEventsTable.Arn
+        - !If
+          - UseAvp
+          - PolicyName: avp
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: [verifiedpermissions:IsAuthorized]
+                  Resource: !GetAtt AvpPolicyStore.Arn
+          - !Ref AWS::NoValue
+
+  SimulateDonationFn:
+    Type: AWS::Serverless::Function
+    Condition: IsAcademic
+    Properties:
+      Description: Simulación académica de confirmación/rechazo (HU-06)
+      CodeUri: ../backend/dist/simulateDonation
+      Handler: index.handler
+      Role: !GetAtt SimulateDonationRole.Arn
+      LoggingConfig: { LogGroup: !Ref SimulateDonationLogGroup }
+      Events:
+        Simulate:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: POST
+            Path: /v1/donations/{donationId}/simulate
+            Auth: { Authorizer: JwtAuthorizer, AuthorizationScopes: [api/donations.write] }
+
+  # T068 - historial propio y donación por id
+  ReadDonationsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 14
+
+  ReadDonationsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt ReadDonationsLogGroup.Arn
+        - PolicyName: donations-read
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem]
+                Resource: !GetAtt DonationsTable.Arn
+              - Effect: Allow
+                Action: [dynamodb:Query]
+                Resource: !Sub "${DonationsTable.Arn}/index/donorSub-createdAt"
+              - Effect: Allow
+                Action: [dynamodb:PutItem]
+                Resource: !GetAtt AuditEventsTable.Arn
+        - !If
+          - UseAvp
+          - PolicyName: avp
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: [verifiedpermissions:IsAuthorized]
+                  Resource: !GetAtt AvpPolicyStore.Arn
+          - !Ref AWS::NoValue
+
+  ReadDonationsFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Historial propio y donación por id con control BOLA (HU-07)
+      CodeUri: ../backend/dist/readDonations
+      Handler: index.handler
+      Role: !GetAtt ReadDonationsRole.Arn
+      LoggingConfig: { LogGroup: !Ref ReadDonationsLogGroup }
+      Events:
+        Mine:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: GET
+            Path: /v1/donations/me
+            Auth: { Authorizer: JwtAuthorizer, AuthorizationScopes: [api/donations.read] }
+        ById:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: GET
+            Path: /v1/donations/{donationId}
+            Auth: { Authorizer: JwtAuthorizer, AuthorizationScopes: [api/donations.read] }
+
+  # T087 - auditoría (HU-10, extensión). Solo Query sobre AuditEvents.
+  AuditLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 14
+
+  AuditRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt AuditLogGroup.Arn
+        - PolicyName: audit-read
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:Query]
+                Resource: !GetAtt AuditEventsTable.Arn
+              # Una denegación (no AUDITOR) se registra como AUTHZ_DENIED.
+              - Effect: Allow
+                Action: [dynamodb:PutItem]
+                Resource: !GetAtt AuditEventsTable.Arn
+        - !If
+          - UseAvp
+          - PolicyName: avp
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: [verifiedpermissions:IsAuthorized]
+                  Resource: !GetAtt AvpPolicyStore.Arn
+          - !Ref AWS::NoValue
+
+  AuditFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Consulta de eventos de auditoría (HU-10)
+      CodeUri: ../backend/dist/audit
+      Handler: index.handler
+      Role: !GetAtt AuditRole.Arn
+      LoggingConfig: { LogGroup: !Ref AuditLogGroup }
+      Events:
+        List:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: GET
+            Path: /v1/audit
+            Auth: { Authorizer: JwtAuthorizer, AuthorizationScopes: [api/audit.read] }
+
+  # ---------------------------------------------------------------------------
+  # T092 - Amazon Verified Permissions (HU-12, extensión). Políticas en policies/*.cedar.
+  # ---------------------------------------------------------------------------
+  AvpPolicyStore:
+    Type: AWS::VerifiedPermissions::PolicyStore
+    Condition: UseAvp
+    Properties:
+      Description: Donaciones seguras - Policy Engine externo (HU-12)
+      ValidationSettings: { Mode: "OFF" }
+
+  AvpPolicyGestor:
+    Type: AWS::VerifiedPermissions::Policy
+    Condition: UseAvp
+    Properties:
+      PolicyStoreId: !Ref AvpPolicyStore
+      Definition:
+        Static:
+          Description: GESTOR administra proyectos (CA-04.1, CA-08.1)
+          Statement: |
+            permit (
+              principal in Aqp::Group::"GESTOR",
+              action in [Aqp::Action::"projects:create", Aqp::Action::"projects:update",
+                         Aqp::Action::"projects:publish", Aqp::Action::"projects:listManage"],
+              resource
+            );
+
+  AvpPolicyDonante:
+    Type: AWS::VerifiedPermissions::Policy
+    Condition: UseAvp
+    Properties:
+      PolicyStoreId: !Ref AvpPolicyStore
+      Definition:
+        Static:
+          Description: DONANTE crea, simula y consulta sus donaciones (CA-05.1, CA-07.1)
+          Statement: |
+            permit (
+              principal in Aqp::Group::"DONANTE",
+              action in [Aqp::Action::"donations:create", Aqp::Action::"donations:simulate",
+                         Aqp::Action::"donations:readOwn", Aqp::Action::"donations:readById"],
+              resource
+            );
+
+  AvpPolicyOwnership:
+    Type: AWS::VerifiedPermissions::Policy
+    Condition: UseAvp
+    Properties:
+      PolicyStoreId: !Ref AvpPolicyStore
+      Definition:
+        Static:
+          Description: Solo el propietario accede a una donación (CA-07.2, BOLA)
+          Statement: |
+            forbid (
+              principal,
+              action in [Aqp::Action::"donations:simulate", Aqp::Action::"donations:readById"],
+              resource is Aqp::Donation
+            )
+            unless { resource.donorSub == principal.sub };
+
+  AvpPolicyAuditor:
+    Type: AWS::VerifiedPermissions::Policy
+    Condition: UseAvp
+    Properties:
+      PolicyStoreId: !Ref AvpPolicyStore
+      Definition:
+        Static:
+          Description: AUDITOR consulta auditoría (CA-10.1)
+          Statement: |
+            permit (
+              principal in Aqp::Group::"AUDITOR",
+              action == Aqp::Action::"audit:read",
+              resource
+            );
+
+  # ---------------------------------------------------------------------------
+  # T094 - Frontend: S3 privado + CloudFront con OAC y response headers policy
+  # (RNF-HU-01, RNF-HU-11, CA-NF01.1, CA-NF11.2). Sin Lambda@Edge.
+  # ---------------------------------------------------------------------------
+  WebBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+  WebOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-web-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  WebSecurityHeaders:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub "${AWS::StackName}-security-headers"
+        SecurityHeadersConfig:
+          ContentSecurityPolicy:
+            Override: true
+            ContentSecurityPolicy: !Sub >-
+              default-src 'self';
+              script-src 'self';
+              style-src 'self';
+              img-src 'self' data:;
+              font-src 'self';
+              connect-src 'self' https://${Api}.execute-api.${AWS::Region}.amazonaws.com https://cognito-idp.${AWS::Region}.amazonaws.com https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com;
+              form-action 'self' https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com;
+              frame-ancestors 'none';
+              base-uri 'self';
+              object-src 'none'
+          StrictTransportSecurity:
+            Override: true
+            AccessControlMaxAgeSec: 31536000
+            IncludeSubdomains: true
+          ContentTypeOptions: { Override: true }
+          ReferrerPolicy:
+            Override: true
+            ReferrerPolicy: strict-origin-when-cross-origin
+          FrameOptions:
+            Override: true
+            FrameOption: DENY
+
+  WebDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: Donaciones seguras - SPA
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: web-s3
+            DomainName: !GetAtt WebBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt WebOriginAccessControl.Id
+            S3OriginConfig: { OriginAccessIdentity: "" }
+        DefaultCacheBehavior:
+          TargetOriginId: web-s3
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
+          ResponseHeadersPolicyId: !Ref WebSecurityHeaders
+        # Rutas de la SPA (React Router): S3 responde 403 a claves inexistentes.
+        CustomErrorResponses:
+          - { ErrorCode: 403, ResponseCode: 200, ResponsePagePath: /index.html, ErrorCachingMinTTL: 0 }
+          - { ErrorCode: 404, ResponseCode: 200, ResponsePagePath: /index.html, ErrorCachingMinTTL: 0 }
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+  WebBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontOAC
+            Effect: Allow
+            Principal: { Service: cloudfront.amazonaws.com }
+            Action: s3:GetObject
+            Resource: !Sub "${WebBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${WebDistribution}"
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: { AWS: "*" }
+            Action: "s3:*"
+            Resource: [!GetAtt WebBucket.Arn, !Sub "${WebBucket.Arn}/*"]
+            Condition:
+              Bool: { aws:SecureTransport: "false" }
+
 Outputs:
   ApiUrl:
     Description: URL base de la HTTP API (stage academic)
@@ -310,3 +974,16 @@ Outputs:
     Value: !Ref IdempotencyTable
   AuditEventsTableName:
     Value: !Ref AuditEventsTable
+  WebUrl:
+    Description: URL HTTPS del frontend (CloudFront). Usarla como WebOrigin en el segundo despliegue.
+    Value: !Sub "https://${WebDistribution.DomainName}"
+  WebBucketName:
+    Description: Bucket privado del frontend (vaciar antes de sam delete)
+    Value: !Ref WebBucket
+  WebDistributionId:
+    Description: ID de la distribución CloudFront (invalidaciones)
+    Value: !Ref WebDistribution
+  AvpPolicyStoreId:
+    Condition: UseAvp
+    Description: Policy store de Verified Permissions (HU-12)
+    Value: !Ref AvpPolicyStore

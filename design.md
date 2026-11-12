@@ -150,6 +150,8 @@ flowchart TD
 | Dependencias vulnerables | `npm audit` y Dependabot en CI | Reporte CI |
 | Falta de trazabilidad | Logs JSON sanitizados + `AuditEvents` + CloudTrail | CA-NF07.2 |
 
+**Excepción IAM justificada (T027, principio IV):** el rol de `PreAuthFn` concede solo `cognito-idp:AdminGetUser` y `cognito-idp:AdminListGroupsForUser` sobre `arn:aws:cognito-idp:<región>:<cuenta>:userpool/*`. El ARN del user pool no puede referenciarse sin crear una dependencia circular (pool → trigger → rol → pool); el comodín queda acotado a la cuenta, la región y dos acciones de lectura. Es la única política de la plantilla con `/*` en un `Allow` y la prueba `infra/test/template.test.ts` lo verifica.
+
 ### 6.3 Limitaciones conocidas (deben aparecer en el informe)
 
 - **Revocación:** el JWT authorizer valida tokens localmente; un access token revocado sigue siendo válido hasta su expiración. Mitigación: vida corta (AD-07). Alternativa avanzada: Lambda authorizer con lista de revocación.
