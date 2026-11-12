@@ -11,7 +11,7 @@
 
 ## Resultado
 
-**Parcialmente aprobada.** Cumplen: retención de 14 días, formato JSON con los campos pedidos, ausencia de datos sensibles, caso exitoso y casos 401, y CloudTrail. **Pendiente:** el caso 403 (`AUTHZ_DENIED`), que requiere ejecutar la prueba T03 con un token de donante (ver §4).
+**Aprobada.** Cumplen: retención de 14 días, formato JSON con los campos pedidos, ausencia de datos sensibles, caso exitoso, casos 401 y 403 (con su evento de auditoría `AUTHZ_DENIED`), y CloudTrail.
 
 ## 1. Retención de 14 días (CA-NF07.1)
 
@@ -50,13 +50,52 @@ Los 401 los emite API Gateway antes de invocar la Lambda, por lo que aparecen en
 - `integrationLatency: "-"` confirma que la Lambda **no se invocó**: el autorizador JWT cortó la solicitud.
 - Resumen del log de acceso revisado: 22 respuestas 200, 20 respuestas 204 (preflight CORS) y 18 respuestas 401.
 
-## 4. Caso 403 (`AUTHZ_DENIED`): pendiente
+## 4. Caso 403 (`AUTHZ_DENIED`) · prueba T03
 
-Los 403 los emite la Lambda (módulo `authz`) y generan un `AuditEvent` con `eventType = AUTHZ_DENIED`. Para producirlo (prueba **T03**): obtener un token de `donante1` con `scripts/get-tokens.mjs` y llamar a `POST /v1/projects`, que debe responder 403. Después, anotar aquí:
+Los 403 los emite la Lambda (módulo `authz`), no API Gateway: el token es válido pero el rol no alcanza. Se produjo con un token de `donante1` (obtenido con `scripts/get-tokens.mjs`) llamando a `POST /v1/projects`, operación reservada al grupo `GESTOR` (CA-04.1):
 
-- el `requestId` de la respuesta,
-- la línea del log de `ManageProjectsFn` con `"outcome":"DENIED"` y `"statusCode":403`,
-- el evento `AUTHZ_DENIED` de la tabla `AuditEvents` (con `actorRef` seudonimizado).
+```bash
+curl -i -X POST "$API_URL/v1/projects" -H "Authorization: Bearer $DONOR_TOKEN" -H "Content-Type: application/json" -d '{"title":"Prueba T03","description":"Un donante no puede crear proyectos","goalAmountCents":100000}'
+```
+
+Respuesta (`requestId` = `GtbR0hGOiYcEMpw=`):
+
+```text
+HTTP/1.1 403 Forbidden
+{"code":"FORBIDDEN","message":"Operación no permitida","requestId":"GtbR0hGOiYcEMpw="}
+```
+
+El mismo `requestId` aparece en tres registros:
+
+1. **Log de acceso de la API** (el token pasó el autorizador: `authorizerError` es `-`):
+
+```json
+{"requestId":"GtbR0hGOiYcEMpw=","routeKey":"POST /v1/projects","status":"403","responseLength":"87","responseLatency":"1054","integrationLatency":"978","authorizerError":"-"}
+```
+
+2. **Log de la Lambda `ManageProjectsFn`:**
+
+```json
+{"level":"WARN","timestamp":"2026-11-12T04:23:27.435Z","requestId":"GtbR0hGOiYcEMpw=","action":"POST /v1/projects","outcome":"DENIED","statusCode":403,"durationMs":480}
+```
+
+3. **Tabla `AuditEvents`** (consulta `eventType = AUTHZ_DENIED`):
+
+| Campo | Valor |
+|---|---|
+| `eventType` | `AUTHZ_DENIED` |
+| `timestamp` | `2026-11-12T04:23:26.968Z` |
+| `requestId` | `GtbR0hGOiYcEMpw=` |
+| `actorRef` | `ca27f9efebcbf7184292f0684497e1e3` (seudónimo: HMAC del `sub`, no el `sub`) |
+| `action` | `projects:create` |
+| `resourceRef` | `POST /v1/projects` |
+| `outcome` | `DENIED` |
+
+El evento no contiene tokens, importes, claves de idempotencia ni el `sub` en claro (CA-10.2).
+
+**Diferencia entre 401 y 403:** el 401 (§3) lo emite API Gateway antes de invocar la Lambda (`integrationLatency: "-"`); el 403 lo emite la Lambda tras validar el grupo del usuario (`integrationLatency` > 0) y deja evidencia en el log y en la auditoría.
+
+> **Nota de la ejecución:** las dos primeras llamadas devolvieron 401 (`invalid number of segments`) porque al copiar el token de la terminal se colaron saltos de línea en la variable. Se limpió con `tr -d '\n\r '` y la tercera llamada dio el 403. El token no se guardó en ningún archivo.
 
 ## 5. Sin datos sensibles en los logs (CA-NF01.2)
 
@@ -98,5 +137,7 @@ Corresponden, en orden, al primer intento de la pila base (falló y se revirtió
 ## Qué demuestra
 
 - **CA-NF07.1:** logs JSON con `requestId`, acción, resultado, código HTTP y duración; retención de 14 días.
-- **CA-NF07.2 (parcial):** caso exitoso y casos 401 visibles; CloudTrail registra los cambios de infraestructura. Falta el caso 403.
+- **CA-NF07.2:** un caso exitoso y casos rechazados 401 y 403 visibles en CloudWatch; CloudTrail registra los cambios de infraestructura.
+- **CA-04.1 (T03):** un donante no puede crear proyectos; la denegación queda auditada con un actor seudonimizado.
 - **CA-NF01.2:** ningún log contiene tokens, llaves ni identidades en claro.
+git add evidence/RNF-HU-07-observabilidad.md AI_USAGE.md
