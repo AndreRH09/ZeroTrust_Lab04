@@ -1,0 +1,435 @@
+﻿"ID CP","Título","Técnicas","Pasos","Entrada","Resultado Esperado","Resultado Actual","Estado","Prioridad","Requisitos","Implementación"
+"CP-UNI-VAL-001","Monto de donación dentro del rango permitido","AVL, ECP","1. Validar CreateDonationBody con el límite inferior, un valor típico y el límite superior.","amountCents = 100, 2500, 100000","El esquema acepta el cuerpo","Igual al esperado (3 pruebas)","✅ Aprobado","Alta","HU-05, CA-05.1, T04","shared/test/schemas.test.ts"
+"CP-UNI-VAL-002","Monto fuera de rango, no entero o de tipo incorrecto","AVL, ECP, PN","1. Validar CreateDonationBody con cada monto inválido.","99, 100001, 0, -1, 1.5, ""100"", null, undefined","El esquema rechaza cada valor","Igual al esperado (8 pruebas)","✅ Aprobado","Alta","CA-05.2, T04","shared/test/schemas.test.ts"
+"CP-UNI-VAL-003","Campos de pago o de identidad en la donación","PN, ECP","1. Validar CreateDonationBody con un campo adicional cada vez.","cardNumber, cvv, dni, donorSub, bankAccount","Rechazo por esquema estricto (no se aceptan datos de pago ni identidad del cliente)","Igual al esperado (5 pruebas)","✅ Aprobado","Alta","CA-05.3, CA-05.5","shared/test/schemas.test.ts"
+"CP-UNI-VAL-004","projectId que no es UUID","ECP, PN","1. Validar CreateDonationBody con un projectId mal formado.","projectId = ""abc""","Rechazo","Igual al esperado (1 prueba)","✅ Aprobado","Media","HU-05","shared/test/schemas.test.ts"
+"CP-UNI-VAL-005","Proyecto válido con espacios sobrantes","ECP","1. Validar CreateProjectBody con título y descripción rodeados de espacios.","""  Comedor  "", descripción ≥ 10, objetivo válido","Se acepta y se recortan los espacios","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-08.1","shared/test/schemas.test.ts"
+"CP-UNI-VAL-006","Objetivo de proyecto inválido","AVL, ECP, PN","1. Validar CreateProjectBody con cada objetivo inválido.","goalAmountCents = 0, -100, 99, 1.5, 100000001","Rechazo en todos los casos","Igual al esperado (5 pruebas)","✅ Aprobado","Alta","CA-08.1","shared/test/schemas.test.ts"
+"CP-UNI-VAL-007","Proyecto con campos no permitidos","PN","1. Validar CreateProjectBody con status y donorSub.","{ …, status: ""PUBLICADO"", donorSub }","Rechazo: el estado y la identidad no los fija el cliente","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-08.1, CA-04.3","shared/test/schemas.test.ts"
+"CP-UNI-VAL-008","Actualización de proyecto vacía","ECP, PN","1. Validar UpdateProjectBody sin campos.","{}","Rechazo: exige al menos un campo","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-08.1","shared/test/schemas.test.ts"
+"CP-UNI-VAL-009","Resultado de simulación solo CONFIRM o REJECT","ECP, PN","1. Validar SimulateBody con valores válidos e inválidos.","CONFIRM, REJECT, otros","Solo se aceptan CONFIRM y REJECT","Igual al esperado (1 prueba)","✅ Aprobado","Media","HU-06","shared/test/schemas.test.ts"
+"CP-UNI-CAT-001","El listado público solo devuelve proyectos PUBLICADO (T01)","ECP","1. Construir el evento de HTTP API «GET /v1/projects» con los claims del authorizer de un visitante.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Tabla con proyectos PUBLICADO y BORRADOR","Consulta el GSI status-createdAt con status = PUBLICADO; nunca devuelve BORRADOR ni createdByRef","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","HU-01, CA-01.1, CA-01.2, T01","backend/test/unit/projects/publicProjects.test.ts"
+"CP-UNI-CAT-002","Catálogo vacío","AVL","1. Construir el evento de HTTP API «GET /v1/projects» con los claims del authorizer de un visitante.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Sin proyectos publicados","200 { items: [] }","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-01.3","backend/test/unit/projects/publicProjects.test.ts"
+"CP-UNI-CAT-003","Detalle de un proyecto publicado","CU","1. Construir el evento de HTTP API «GET /v1/projects/{projectId}» con los claims del authorizer de un visitante.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","projectId de un proyecto PUBLICADO","200 sin datos de donantes","Igual al esperado (1 prueba)","✅ Aprobado","Alta","HU-02, CA-02.1","backend/test/unit/projects/publicProjects.test.ts"
+"CP-UNI-CAT-004","Detalle de borrador, inexistente o id inválido","ECP, PN","1. Construir el evento de HTTP API «GET /v1/projects/{projectId}» con los claims del authorizer de un visitante.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","BORRADOR · id inexistente · id no UUID","404 con el mismo cuerpo en los tres casos (no revela borradores)","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-02.2","backend/test/unit/projects/publicProjects.test.ts"
+"CP-UNI-CAT-005","Indicadores agregados del proyecto (HU-09)","ECP, AVL","1. Construir el evento de HTTP API «GET /v1/projects/{projectId}/stats» con los claims del authorizer de un visitante.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Confirmado menor y mayor que la meta","Solo acumulado confirmado y progreso entero; el progreso puede superar 100","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","HU-09, CA-09.1","backend/test/unit/projects/publicProjects.test.ts"
+"CP-UNI-CAT-006","Indicadores sin datos personales","PN","1. Construir el evento de HTTP API «GET /v1/projects/{projectId}/stats» con los claims del authorizer de un visitante.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Proyecto con donaciones","No expone donorSub ni registros individuales","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-09.2","backend/test/unit/projects/publicProjects.test.ts"
+"CP-UNI-CAT-007","Estadísticas de un borrador","PN","1. Construir el evento de HTTP API «GET /v1/projects/{projectId}/stats» con los claims del authorizer de un visitante.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","projectId en BORRADOR","404","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-02.2","backend/test/unit/projects/publicProjects.test.ts"
+"CP-UNI-PRY-001","GESTOR crea un proyecto en BORRADOR","CU","1. Construir el evento de HTTP API «POST /v1/projects» con los claims del authorizer de GESTOR.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Título, descripción y objetivo válidos","201 en BORRADOR + evento PROJECT_CREATED","Igual al esperado (1 prueba)","✅ Aprobado","Alta","HU-08, CA-08.1","backend/test/unit/projects/manageProjects.test.ts"
+"CP-UNI-PRY-002","Objetivo inválido al crear","AVL, PN","1. Construir el evento de HTTP API «POST /v1/projects» con los claims del authorizer de GESTOR.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","objetivo 0, -5, 1.5","400 en los tres casos","Igual al esperado (3 pruebas)","✅ Aprobado","Alta","CA-08.1","backend/test/unit/projects/manageProjects.test.ts"
+"CP-UNI-PRY-003","Roles no gestores no pueden crear proyectos (T03)","TD, PN","1. Construir el evento de HTTP API «POST /v1/projects» con los claims del authorizer de DONANTE, AUDITOR y sin grupo.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Cuerpo válido con tres identidades sin GESTOR","403 + AUTHZ_DENIED y ninguna escritura del proyecto","Igual al esperado (3 pruebas)","✅ Aprobado","Alta","HU-04, CA-04.1, T03","backend/test/unit/projects/manageProjects.test.ts"
+"CP-UNI-PRY-004","Se autoriza antes de validar el cuerpo","CE","1. Construir el evento de HTTP API «POST /v1/projects» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Cuerpo inválido enviado por un DONANTE","403 (no 400): no se revela la forma esperada del recurso","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-04.1","backend/test/unit/projects/manageProjects.test.ts"
+"CP-UNI-PRY-005","Crear un proyecto sin token","PN","1. Construir el evento de HTTP API «POST /v1/projects» con los claims del authorizer de nadie (sin claims).
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Sin Authorization","401","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-03.2, T02","backend/test/unit/projects/manageProjects.test.ts"
+"CP-UNI-PRY-006","Editar un BORRADOR","TE","1. Construir el evento de HTTP API «PATCH /v1/projects/{projectId}» con los claims del authorizer de GESTOR.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Proyecto en BORRADOR","200 con escritura condicionada a status = BORRADOR","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-08.1","backend/test/unit/projects/manageProjects.test.ts"
+"CP-UNI-PRY-007","Editar un proyecto PUBLICADO","TE, PN","1. Construir el evento de HTTP API «PATCH /v1/projects/{projectId}» con los claims del authorizer de GESTOR.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Proyecto PUBLICADO","409","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-08.2","backend/test/unit/projects/manageProjects.test.ts"
+"CP-UNI-PRY-008","Editar un proyecto inexistente","PN","1. Construir el evento de HTTP API «PATCH /v1/projects/{projectId}» con los claims del authorizer de GESTOR.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","projectId inexistente","404","Igual al esperado (1 prueba)","✅ Aprobado","Media","HU-08","backend/test/unit/projects/manageProjects.test.ts"
+"CP-UNI-PRY-009","Edición vacía o que intenta cambiar el estado","ECP, PN","1. Construir el evento de HTTP API «PATCH /v1/projects/{projectId}» con los claims del authorizer de GESTOR.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","{} · { status }","400","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-08.1","backend/test/unit/projects/manageProjects.test.ts"
+"CP-UNI-PRY-010","Publicar un BORRADOR","TE","1. Construir el evento de HTTP API «PATCH /v1/projects/{projectId}/publish» con los claims del authorizer de GESTOR.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Proyecto en BORRADOR","200 PUBLICADO + evento PROJECT_PUBLISHED","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-08.2","backend/test/unit/projects/manageProjects.test.ts"
+"CP-UNI-PRY-011","Republicar un proyecto","TE, PN","1. Construir el evento de HTTP API «PATCH /v1/projects/{projectId}/publish» con los claims del authorizer de GESTOR.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Proyecto ya PUBLICADO","409","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-08.2","backend/test/unit/projects/manageProjects.test.ts"
+"CP-UNI-PRY-012","DONANTE intenta publicar (T03)","TD, PN","1. Construir el evento de HTTP API «PATCH /v1/projects/{projectId}/publish» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Proyecto en BORRADOR","403","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-04.1, T03","backend/test/unit/projects/manageProjects.test.ts"
+"CP-UNI-PRY-013","Listado de gestión según rol","TD","1. Construir el evento de HTTP API «GET /v1/manage/projects» con los claims del authorizer de GESTOR y DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Proyectos BORRADOR y PUBLICADO","GESTOR ve ambos estados; DONANTE recibe 403","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","HU-08, CA-04.1","backend/test/unit/projects/manageProjects.test.ts"
+"CP-UNI-DON-001","Intención de donación válida (T05)","CU","1. Construir el evento de HTTP API «POST /v1/donations» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","{ projectId, amountCents: 2500 } + Idempotency-Key UUID","201 PENDIENTE_SIMULACION escrito en un único TransactWriteItems","Igual al esperado (1 prueba)","✅ Aprobado","Alta","HU-05, CA-05.1, T05","backend/test/unit/donations/createDonation.test.ts"
+"CP-UNI-DON-002","El donante siempre sale del token (CA-05.3)","PN","1. Construir el evento de HTTP API «POST /v1/donations» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Cuerpo con donorSub de otra persona","400 por esquema estricto; donorSub = claim del token","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-05.3, CA-04.3","backend/test/unit/donations/createDonation.test.ts"
+"CP-UNI-DON-003","Montos inválidos en el API (T04)","AVL, ECP, PN","1. Construir el evento de HTTP API «POST /v1/donations» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","amountCents = 0, 100001, 1.5, ""100"", -100, null","400 y ninguna escritura","Igual al esperado (6 pruebas)","✅ Aprobado","Alta","CA-05.2, T04","backend/test/unit/donations/createDonation.test.ts"
+"CP-UNI-DON-004","Datos de pago en la solicitud (CA-05.5)","PN","1. Construir el evento de HTTP API «POST /v1/donations» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Cuerpo con campos de tarjeta","400","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-05.5","backend/test/unit/donations/createDonation.test.ts"
+"CP-UNI-DON-005","Idempotency-Key ausente o inválida","ECP, PN","1. Construir el evento de HTTP API «POST /v1/donations» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Sin cabecera · valor no UUID","400","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-05.4","backend/test/unit/donations/createDonation.test.ts"
+"CP-UNI-DON-006","Proyecto inexistente o no publicado","ECP, PN","1. Construir el evento de HTTP API «POST /v1/donations» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","projectId inexistente · proyecto en BORRADOR","404 · 409","Igual al esperado (1 prueba)","✅ Aprobado","Media","HU-05","backend/test/unit/donations/createDonation.test.ts"
+"CP-UNI-DON-007","Un GESTOR no puede donar (CA-04.1)","TD, PN","1. Construir el evento de HTTP API «POST /v1/donations» con los claims del authorizer de GESTOR.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Cuerpo válido","403","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-04.1","backend/test/unit/donations/createDonation.test.ts"
+"CP-UNI-DON-008","Donar sin token (T02)","PN","1. Construir el evento de HTTP API «POST /v1/donations» con los claims del authorizer de nadie (sin claims).
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Sin Authorization","401","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-03.2, T02","backend/test/unit/donations/createDonation.test.ts"
+"CP-UNI-DON-009","Proyecto despublicado durante la transacción","CE, TE","1. Construir el evento de HTTP API «POST /v1/donations» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","La condición del proyecto falla en TransactWriteItems","409","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-NF04.2","backend/test/unit/donations/createDonation.test.ts"
+"CP-UNI-DON-010","Repetir clave y carga idénticas (T06)","CU","1. Construir el evento de HTTP API «POST /v1/donations (dos veces)» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Misma Idempotency-Key y mismo cuerpo","Misma respuesta; ninguna escritura nueva","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-05.4, T06","backend/test/unit/donations/createDonation.test.ts"
+"CP-UNI-DON-011","Repetir clave con otra carga (T07)","PN","1. Construir el evento de HTTP API «POST /v1/donations (dos veces)» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Misma Idempotency-Key, monto distinto","409","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-05.4, T07","backend/test/unit/donations/createDonation.test.ts"
+"CP-UNI-DON-012","Registro de idempotencia expirado","TE, AVL","1. Construir el evento de HTTP API «POST /v1/donations» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Registro con expiresAt vencido","Se ignora y se crea una donación nueva","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-05.4","backend/test/unit/donations/createDonation.test.ts"
+"CP-UNI-DON-013","La clave de idempotencia se aísla por donante","ECP","1. Construir el evento de HTTP API «POST /v1/donations» con los claims del authorizer de dos DONANTES.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","La misma clave usada por dos personas","La clave primaria incluye el sub: no hay colisión entre donantes","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-05.4","backend/test/unit/donations/createDonation.test.ts"
+"CP-UNI-DON-014","Carrera con la misma clave","CE, CON","1. Construir el evento de HTTP API «POST /v1/donations» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","TransactionCanceled en la reserva de la clave","Relee y devuelve la respuesta almacenada","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-05.4, CA-NF04.2","backend/test/unit/donations/createDonation.test.ts"
+"CP-UNI-DON-015","Hash canónico de la carga y TTL de 24 h","ECP","1. Calcular el payloadHash con las propiedades en distinto orden.
+2. Verificar expiresAt del registro.","{a,b} y {b,a}","Mismo SHA-256; expiresAt = ahora + 86400","Igual al esperado (2 pruebas)","✅ Aprobado","Media","CA-05.4","backend/test/unit/donations/createDonation.test.ts"
+"CP-UNI-HIS-001","El historial se consulta con el sub del token (CA-07.1)","CU","1. Construir el evento de HTTP API «GET /v1/donations/me» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Token de un donante","Consulta el GSI donorSub-createdAt solo con el sub del token","Igual al esperado (1 prueba)","✅ Aprobado","Alta","HU-07, CA-07.1","backend/test/unit/donations/readDonations.test.ts"
+"CP-UNI-HIS-002","Un GESTOR no accede a historiales (T12)","TD, PN","1. Construir el evento de HTTP API «GET /v1/donations/me y /{id}» con los claims del authorizer de GESTOR.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Token de GESTOR","403 sin consultar ni leer datos","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","CA-04.2, T12","backend/test/unit/donations/readDonations.test.ts"
+"CP-UNI-HIS-003","Leer una donación propia","CU","1. Construir el evento de HTTP API «GET /v1/donations/{donationId}» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","donationId propio","200","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-07.2","backend/test/unit/donations/readDonations.test.ts"
+"CP-UNI-HIS-004","Leer una donación ajena (T09)","PN","1. Construir el evento de HTTP API «GET /v1/donations/{donationId}» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","donationId de otro donante","404 idéntico al de inexistente + AUTHZ_DENIED","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-07.2, T09","backend/test/unit/donations/readDonations.test.ts"
+"CP-UNI-HIS-005","Id de donación no UUID","ECP, PN","1. Construir el evento de HTTP API «GET /v1/donations/{donationId}» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","donationId = ""abc""","404","Igual al esperado (1 prueba)","✅ Aprobado","Baja","CA-07.2","backend/test/unit/donations/readDonations.test.ts"
+"CP-UNI-SIM-001","Confirmar la simulación","TE","1. Construir el evento de HTTP API «POST /v1/donations/{id}/simulate» con los claims del authorizer de DONANTE propietario.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","outcome = CONFIRM sobre PENDIENTE_SIMULACION","CONFIRMADA_SIMULADA y ADD al acumulado en la misma transacción","Igual al esperado (1 prueba)","✅ Aprobado","Alta","HU-06, CA-06.1","backend/test/unit/donations/simulateDonation.test.ts"
+"CP-UNI-SIM-002","Rechazar la simulación (CA-06.3)","TE","1. Construir el evento de HTTP API «POST /v1/donations/{id}/simulate» con los claims del authorizer de DONANTE propietario.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","outcome = REJECT","RECHAZADA_SIMULADA sin tocar el proyecto","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-06.3","backend/test/unit/donations/simulateDonation.test.ts"
+"CP-UNI-SIM-003","Simular una donación en estado terminal (CA-06.2)","TE, PN","1. Construir el evento de HTTP API «POST /v1/donations/{id}/simulate» con los claims del authorizer de DONANTE propietario.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Donación CONFIRMADA o RECHAZADA","409 sin transacción","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-06.2","backend/test/unit/donations/simulateDonation.test.ts"
+"CP-UNI-SIM-004","Confirmaciones concurrentes: un solo incremento (T08, unitaria)","CE, CON","1. Construir el evento de HTTP API «POST /v1/donations/{id}/simulate» con los claims del authorizer de DONANTE propietario.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Otra solicitud ganó: la condición de la transacción falla","409; el acumulado se incrementa una sola vez","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-06.2, CA-NF04.1, T08","backend/test/unit/donations/simulateDonation.test.ts"
+"CP-UNI-SIM-005","Simular una donación ajena o sin rol de donante","TD, PN","1. Construir el evento de HTTP API «POST /v1/donations/{id}/simulate» con los claims del authorizer de DONANTE no propietario y GESTOR.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Donación de otro donante · token de GESTOR","404 + AUTHZ_DENIED · 403","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","CA-07.2, CA-04.1","backend/test/unit/donations/simulateDonation.test.ts"
+"CP-UNI-SIM-006","Resultado inválido o donación inexistente","ECP, PN","1. Construir el evento de HTTP API «POST /v1/donations/{id}/simulate» con los claims del authorizer de DONANTE.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","outcome inválido · id inexistente","400 · 404","Igual al esperado (2 pruebas)","✅ Aprobado","Media","HU-06","backend/test/unit/donations/simulateDonation.test.ts"
+"CP-UNI-AZN-001","El motor externo (Verified Permissions) decide igual que el embebido","TD","1. Para cada combinación de grupos × acción × propietario, decidir con policy.ts y con el adaptador AVP (evaluador Cedar simulado).
+2. Comparar las decisiones.","5 conjuntos de grupos × 9 acciones × propio/ajeno = 90 combinaciones","Las 90 decisiones coinciden","Igual al esperado (90 pruebas)","✅ Aprobado","Media","HU-12, CA-12.2","backend/test/unit/authz/avpPolicy.test.ts"
+"CP-UNI-AZN-002","Solicitud a AVP con principal, acción y grupos","PC","1. Invocar el adaptador AVP.
+2. Inspeccionar la solicitud IsAuthorized enviada.","DONANTE + donations:create","Envía principal, acción y grupos como entidades padre","Igual al esperado (1 prueba)","✅ Aprobado","Media","HU-12, CA-12.1","backend/test/unit/authz/avpPolicy.test.ts"
+"CP-UNI-AZN-003","Matriz rol × acción sobre proyectos (T03)","TD","1. Evaluar policy.ts para cada rol y acción de proyectos.","VISITANTE, DONANTE, GESTOR, AUDITOR, MULTI × create/update/publish/listManage","Solo GESTOR (y MULTI, que lo incluye) está permitido","Igual al esperado (20 pruebas)","✅ Aprobado","Alta","HU-04, CA-04.1, T03","backend/test/unit/authz/policy.test.ts"
+"CP-UNI-AZN-004","Matriz rol × acción sobre donaciones (T12)","TD","1. Evaluar policy.ts para cada rol y acción de donaciones.","5 roles × create/simulate/readOwn/readById","Solo DONANTE (y MULTI) está permitido; GESTOR y AUDITOR no","Igual al esperado (20 pruebas)","✅ Aprobado","Alta","CA-04.2, T12","backend/test/unit/authz/policy.test.ts"
+"CP-UNI-AZN-005","Matriz rol × acción sobre auditoría","TD","1. Evaluar policy.ts para audit:read con cada rol.","5 roles × audit:read","Solo AUDITOR; MULTI (DONANTE+GESTOR) no","Igual al esperado (5 pruebas)","✅ Aprobado","Alta","HU-10, CA-10.1","backend/test/unit/authz/policy.test.ts"
+"CP-UNI-AZN-006","Donación ajena responde como inexistente (T09)","TD, PN","1. Evaluar la regla de propietario con una donación propia y una ajena.","Donante A sobre donación de A y de B","Propia: permitido · Ajena: NOT_FOUND (no revela existencia)","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","CA-07.2, T09","backend/test/unit/authz/policy.test.ts"
+"CP-UNI-AZN-007","El rol se evalúa antes que el propietario (T12)","TD","1. Evaluar a un GESTOR sobre una donación ajena.","GESTOR + donations:readById","FORBIDDEN (403), no NOT_FOUND","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-04.2, T12","backend/test/unit/authz/policy.test.ts"
+"CP-UNI-AZN-008","Toda denegación queda auditada","CU","1. Invocar authorize con una solicitud denegada por rol, otra por propietario y una permitida.","DONANTE crea proyecto · propietario distinto · permitido","403/404 + AUTHZ_DENIED; lo permitido no genera denegación","Igual al esperado (3 pruebas)","✅ Aprobado","Alta","CA-04.1, CA-10.1","backend/test/unit/authz/policy.test.ts"
+"CP-UNI-AZN-009","La identidad sale solo de los claims del authorizer (CA-04.3)","PN, CE","1. Construir eventos con sub, groups y role inyectados en body, query y cabeceras.
+2. Llamar a getPrincipal.","sub/groups/role falsificados por el cliente","Se ignoran; sub y grupos salen de los claims verificados","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","CA-04.3","backend/test/unit/authz/principal.test.ts"
+"CP-UNI-AZN-010","Lectura de grupos del authorizer","ECP","1. Parsear los grupos en los formatos de HTTP API.","""[A B]"", arrays, grupos desconocidos o vacíos","Lista correcta; descarta valores inválidos","Igual al esperado (2 pruebas)","✅ Aprobado","Media","CA-04.3","backend/test/unit/authz/principal.test.ts"
+"CP-UNI-AUT-001","Solicitud protegida sin token (T02)","PN","1. Llamar a getPrincipal con un evento sin claims.","Sin claims del authorizer","401","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-03.2, T02","backend/test/unit/authz/principal.test.ts"
+"CP-UNI-AUT-002","ID token usado como Bearer (T11)","PN","1. Llamar a getPrincipal con token_use = id.","Claims de un ID token","401 (defensa en profundidad además del authorizer)","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-03.2, CA-NF02.1, T11","backend/test/unit/authz/principal.test.ts"
+"CP-UNI-IDN-001","Cuenta privilegiada sin TOTP no inicia sesión (T14)","TD, PN","1. Construir el evento PreAuthentication de Cognito.
+2. Invocar PreAuthFn con el usuario y sus grupos/MFA simulados.","GESTOR sin TOTP · AUDITOR sin TOTP · TOTP registrado no preferido · DONANTE+GESTOR sin TOTP","Login denegado: Cognito no emite tokens","Igual al esperado (4 pruebas)","✅ Aprobado","Alta","HU-11, CA-11.1, CA-11.2, T14","backend/test/unit/identity/preAuth.test.ts"
+"CP-UNI-IDN-002","Cuentas que sí pueden iniciar sesión","TD","1. Invocar PreAuthFn con cada perfil permitido.","GESTOR con TOTP preferido · DONANTE sin MFA · usuario sin grupos","Permitido (MFA opcional para donantes)","Igual al esperado (3 pruebas)","✅ Aprobado","Alta","HU-11, CA-11.1","backend/test/unit/identity/preAuth.test.ts"
+"CP-UNI-AUD-001","El AUDITOR consulta por tipo y rango de fechas","CU, ECP","1. Construir el evento de HTTP API «GET /v1/audit?eventType&from&to» con los claims del authorizer de AUDITOR.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","AUTHZ_DENIED + rango ISO","200 con los eventos filtrados","Igual al esperado (1 prueba)","✅ Aprobado","Alta","HU-10, CA-10.1","backend/test/unit/audit/auditFn.test.ts"
+"CP-UNI-AUD-002","Otros roles no acceden a la auditoría","TD, PN","1. Construir el evento de HTTP API «GET /v1/audit» con los claims del authorizer de DONANTE y GESTOR.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Tokens sin AUDITOR","403","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","CA-10.1","backend/test/unit/audit/auditFn.test.ts"
+"CP-UNI-AUD-003","Parámetros obligatorios de la consulta","ECP, PN","1. Construir el evento de HTTP API «GET /v1/audit» con los claims del authorizer de AUDITOR.
+2. Invocar el handler con DynamoDB simulado (aws-sdk-client-mock).
+3. Verificar código HTTP, cuerpo de respuesta y escrituras/auditoría.","Sin eventType · fecha no ISO","400","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-10.1","backend/test/unit/audit/auditFn.test.ts"
+"CP-UNI-AUD-004","Seudónimo del actor estable y no reversible","ECP","1. Calcular actorRef para dos usuarios y repetir el cálculo.","sub A, sub B","Estable, distinto del sub y distinto entre usuarios","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-10.2","backend/test/unit/audit/record.test.ts"
+"CP-UNI-AUD-005","El evento de auditoría no guarda datos sensibles","PN, CE","1. Construir el ítem de auditoría con datos sensibles en la entrada.","sub, tokens, importes, claves","sk = timestamp#eventId; sin sub, tokens, importes ni claves; solo tipos definidos","Igual al esperado (3 pruebas)","✅ Aprobado","Alta","CA-10.2, CA-NF01.2","backend/test/unit/audit/record.test.ts"
+"CP-UNI-AUD-006","Escritura del evento y tolerancia a fallos","CE","1. Registrar un evento con DynamoDB disponible y con DynamoDB fallando.","PutItem ok · PutItem lanza excepción","Escribe en AuditEvents; un fallo no interrumpe la solicitud","Igual al esperado (2 pruebas)","✅ Aprobado","Media","CA-10.1","backend/test/unit/audit/record.test.ts"
+"CP-UNI-API-001","Errores uniformes sin detalles internos","CE, PN","1. Hacer que el handler lance cada tipo de error.
+2. Inspeccionar la respuesta HTTP.","HttpError · ZodError · TransactionCanceled · error desconocido · ruta desconocida","{ code, message, requestId } sin stack; 400 sin valores enviados; 409; 500 genérico; 404","Igual al esperado (5 pruebas)","✅ Aprobado","Alta","CA-NF01.2, CA-NF07.1","backend/test/unit/shared/http.test.ts"
+"CP-UNI-API-002","Cabeceras de respuesta del API","PC","1. Generar una respuesta JSON del helper.","Respuesta 200","Cache-Control no-store y X-Content-Type-Options nosniff","Igual al esperado (1 prueba)","✅ Aprobado","Media","RNF-HU-01","backend/test/unit/shared/http.test.ts"
+"CP-UNI-API-003","Log JSON por solicitud (CA-NF07.1)","CU","1. Invocar un handler.
+2. Capturar la salida del logger.","Solicitud exitosa","Una línea JSON con requestId, action, outcome, statusCode y durationMs; silenciable con LOG_SILENT","Igual al esperado (3 pruebas)","✅ Aprobado","Media","RNF-HU-07, CA-NF07.1","backend/test/unit/shared/http.test.ts"
+"CP-UNI-API-004","Los logs redactan secretos (CA-NF01.2)","PN, CE","1. Registrar un objeto con authorization, tokens, sub e idempotencyKey.","Campos sensibles en el contexto del log","Valores redactados","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-NF01.2, RNF-HU-10","backend/test/unit/shared/http.test.ts"
+"CP-UNI-WEB-001","El cliente API envía Bearer, Idempotency-Key y la carga mínima","PC","1. Llamar a api.createDonation con fetch simulado.
+2. Inspeccionar URL, cabeceras y cuerpo.","token, { projectId, amountCents: 2500 }, clave","Authorization Bearer, Idempotency-Key, solo { projectId, amountCents } y credentials: omit","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-05.1, CA-04.3","frontend/test/api.test.ts"
+"CP-UNI-WEB-002","Las rutas públicas no envían Authorization","PN","1. Llamar a api.listProjects con fetch simulado.","Sin sesión","Sin cabecera Authorization","Igual al esperado (1 prueba)","✅ Aprobado","Alta","HU-01","frontend/test/api.test.ts"
+"CP-UNI-WEB-003","Mensajes de error para el usuario","ECP, CE","1. Generar ApiError con cada código o un fallo de red.
+2. Traducirlo con userMessage.","403/404 · 429 · 401 · 500 con ARN · fallo de red (status 0)","Mensaje genérico o específico en español; nunca el mensaje interno; red → «No pudimos conectar…»","Igual al esperado (4 pruebas)","✅ Aprobado","Alta","CA-03.2, CA-NF06.2, CA-NF01.2","frontend/test/api.test.ts"
+"CP-UNI-AUT-003","Configuración OIDC: Authorization Code + PKCE (CA-03.1)","PC","1. Crear el UserManager.
+2. Inspeccionar su configuración.","Variables VITE_* de prueba","response_type = code y scopes de la API","Igual al esperado (1 prueba)","✅ Aprobado","Alta","HU-03, CA-03.1","frontend/test/auth.test.ts"
+"CP-UNI-AUT-004","Tokens solo en memoria (CA-NF11.1)","PN","1. Simular un inicio de sesión.
+2. Revisar localStorage y sessionStorage.","Usuario con access, id y refresh token","Se usa InMemoryWebStorage; ningún token en el almacenamiento del navegador","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","RNF-HU-11, CA-NF11.1","frontend/test/auth.test.ts"
+"CP-UNI-AUT-005","Cierre de sesión con revocación (CA-03.3)","CU, CE","1. Ejecutar logout con la revocación exitosa y con la revocación fallando.","Refresh token vigente","Revoca el refresh token, limpia la memoria y devuelve la URL /logout; limpia aunque la revocación falle","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","CA-03.3","frontend/test/auth.test.ts"
+"CP-UNI-AUT-006","Grupos del access token solo para la interfaz","ECP, PN","1. Decodificar tokens válidos, inválidos y ausentes.","JWT con cognito:groups · texto basura · undefined","Lista de grupos o [] (sin excepción)","Igual al esperado (2 pruebas)","✅ Aprobado","Media","CA-04.3","frontend/test/auth.test.ts"
+"CP-UNI-AUT-007","Guard de rutas protegidas","TD","1. Renderizar RequireAuth con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Variar sesión y configuración de Cognito.
+3. Verificar el resultado por rol accesible o texto visible.","Con sesión · sin sesión · sin configuración","Muestra el contenido · pide iniciar sesión con returnTo = ruta pedida · indica que falta configuración","Igual al esperado (3 pruebas)","✅ Aprobado","Media","HU-03, CA-NF02.2","frontend/test/RequireAuth.test.tsx"
+"CP-UNI-CAT-008","Tarjeta del catálogo con meta y confirmado (CA-01.1)","CU","1. Renderizar el Catálogo con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Esperar la carga de un proyecto.
+3. Verificar el resultado por rol accesible o texto visible.","Proyecto: meta S/ 1,000.00, confirmado S/ 25.00","Nombre, finalidad, meta en PEN y barra con aria-valuenow = 2","Igual al esperado (1 prueba)","✅ Aprobado","Alta","HU-01, CA-01.1, T01","frontend/test/Catalog.test.tsx"
+"CP-UNI-CAT-009","Catálogo vacío en la interfaz (CA-01.3)","AVL","1. Renderizar el Catálogo con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Responder con items = [].
+3. Verificar el resultado por rol accesible o texto visible.","Lista vacía","«Aún no hay proyectos publicados»","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-01.3","frontend/test/Catalog.test.tsx"
+"CP-UNI-CAT-010","Error del servicio sin detalles técnicos","CE, PN","1. Renderizar el Catálogo con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Responder 500 con un ARN en el mensaje.
+3. Verificar el resultado por rol accesible o texto visible.","ApiError 500 «Table arn:aws:dynamodb…»","Alerta «Ocurrió un error inesperado» sin «arn:aws»","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-01.3, CA-NF06.2","frontend/test/Catalog.test.tsx"
+"CP-UNI-CAT-011","Indicadores de la portada","CU","1. Renderizar el Catálogo con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Cargar tres proyectos (uno con la meta cumplida).
+3. Verificar el resultado por rol accesible o texto visible.","Confirmados 200 + 900 + 1000 soles","«1 de 3» metas y total S/ 2,100.00","Igual al esperado (1 prueba)","✅ Aprobado","Media","HU-09, CA-09.1","frontend/test/CatalogFiltros.test.tsx"
+"CP-UNI-CAT-012","Búsqueda, filtro por categoría y orden","ECP","1. Renderizar el Catálogo con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Buscar, filtrar por categoría y cambiar el orden.
+3. Verificar el resultado por rol accesible o texto visible.","«UTILES» · Salud comunitaria · más cerca / más apoyo","Resultados correctos sin distinguir tildes; aria-pressed en el filtro activo; orden por avance","Igual al esperado (3 pruebas)","✅ Aprobado","Media","HU-01","frontend/test/CatalogFiltros.test.tsx"
+"CP-UNI-CAT-013","Búsqueda sin coincidencias","ECP","1. Renderizar el Catálogo con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Buscar un texto inexistente y pulsar «Limpiar filtros».
+3. Verificar el resultado por rol accesible o texto visible.","«zzz»","Estado vacío y restauración de la lista","Igual al esperado (1 prueba)","✅ Aprobado","Baja","HU-01","frontend/test/CatalogFiltros.test.tsx"
+"CP-UNI-CAT-014","Insignia de meta alcanzada","AVL","1. Renderizar el Catálogo con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Cargar un proyecto con confirmado = meta.
+3. Verificar el resultado por rol accesible o texto visible.","Confirmado = meta","Insignia «Meta alcanzada»","Igual al esperado (1 prueba)","✅ Aprobado","Baja","HU-09","frontend/test/CatalogFiltros.test.tsx"
+"CP-UNI-CAT-015","Detalle: objetivo, lo que falta y acumulado de /stats","CU, AVL","1. Renderizar el Detalle con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Responder /stats con 40% y con 120%.
+3. Verificar el resultado por rol accesible o texto visible.","Meta S/ 1,000.00; confirmado S/ 400.00 y S/ 1,200.00","Falta S/ 600.00 y barra 40% · «Meta alcanzada» en vez de un monto negativo","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","HU-02, HU-09, CA-09.1","frontend/test/ProjectDetail.test.tsx"
+"CP-UNI-CAT-016","Botón de donar según la sesión","TD","1. Renderizar el Detalle con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Renderizar con y sin sesión.
+3. Verificar el resultado por rol accesible o texto visible.","Autenticado · visitante","Enlace «Donar (simulado)» · botón «Inicia sesión para donar»","Igual al esperado (1 prueba)","✅ Aprobado","Media","HU-02, HU-05","frontend/test/ProjectDetail.test.tsx"
+"CP-UNI-CAT-017","Detalle no encontrado y sin datos de donantes","PN","1. Renderizar el Detalle con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Responder 404; luego un proyecto válido.
+3. Verificar el resultado por rol accesible o texto visible.","ApiError 404 · proyecto publicado","«Proyecto no encontrado» · ningún dato de donantes en pantalla","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","CA-02.2, CA-09.2","frontend/test/ProjectDetail.test.tsx"
+"CP-UNI-DON-016","El formulario no pide datos de pago (CA-05.5)","PN","1. Renderizar el formulario de donación con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Contar los campos de texto.
+3. Verificar el resultado por rol accesible o texto visible.","—","Un solo campo (monto); ninguno de tarjeta, CVV, cuenta o DNI","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-05.5","frontend/test/Donate.test.tsx"
+"CP-UNI-DON-017","Montos inválidos en el formulario (T04)","AVL, ECP, PN","1. Renderizar el formulario de donación con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Escribir el monto y pulsar «Registrar intención».
+3. Verificar el resultado por rol accesible o texto visible.","10.555, 0, 1000.01, abc","Error accesible (role=alert, aria-invalid) y no se llama al API","Igual al esperado (4 pruebas)","✅ Aprobado","Alta","CA-05.2, CA-NF06.2, T04","frontend/test/Donate.test.tsx"
+"CP-UNI-DON-018","Envío en céntimos con Idempotency-Key","CU","1. Renderizar el formulario de donación con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Escribir 25 y enviar.
+3. Verificar el resultado por rol accesible o texto visible.","«25»","createDonation(token, { projectId, amountCents: 2500 }, UUID)","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-05.1","frontend/test/Donate.test.tsx"
+"CP-UNI-DON-019","Reintentar el mismo envío reutiliza la clave","CE","1. Renderizar el formulario de donación con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Fallar el primer envío y reintentar.
+3. Verificar el resultado por rol accesible o texto visible.","Dos envíos de «30»","La misma Idempotency-Key en ambos intentos","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-05.4","frontend/test/Donate.test.tsx"
+"CP-UNI-DON-020","Montos sugeridos y resumen en vivo","ECP, AVL","1. Renderizar el formulario de donación con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Elegir un monto sugerido, escribir montos válidos e inválidos.
+3. Verificar el resultado por rol accesible o texto visible.","S/ 50 · 100.00 · 25,5 · 5000","Llena el campo y marca aria-pressed; resumen solo con montos válidos; sugeridos dentro de S/ 1–1,000","Igual al esperado (4 pruebas)","✅ Aprobado","Media","HU-05, CA-05.1","frontend/test/DonateMontos.test.tsx"
+"CP-UNI-SIM-007","Pantalla de resultado tras confirmar o rechazar (CA-06.4)","TE","1. Renderizar Resultado con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Pulsar «Confirmar simulación» o «Rechazar simulación».
+3. Verificar el resultado por rol accesible o texto visible.","Donación PENDIENTE_SIMULACION","Aviso literal «Simulación académica: no se ha realizado ningún cobro», nuevo estado y sin el botón usado","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","HU-06, CA-06.1, CA-06.4","frontend/test/Result.test.tsx"
+"CP-UNI-SIM-008","Donación terminal sin opción de simular","TE","1. Renderizar Resultado con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Cargar una donación CONFIRMADA.
+3. Verificar el resultado por rol accesible o texto visible.","CONFIRMADA_SIMULADA","Ningún botón de simulación","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-06.2","frontend/test/Result.test.tsx"
+"CP-UNI-HIS-006","Historial ordenado con estado e importe","CU","1. Renderizar el Historial con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Cargar dos donaciones de fechas distintas.
+3. Verificar el resultado por rol accesible o texto visible.","Confirmada (día 1) y pendiente (día 3)","La más reciente primero, con estado, importe y enlace al detalle","Igual al esperado (1 prueba)","✅ Aprobado","Alta","HU-07, CA-07.1","frontend/test/History.test.tsx"
+"CP-UNI-HIS-007","Indicadores del historial","ECP","1. Renderizar el Historial con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Cargar una donación de cada estado.
+3. Verificar el resultado por rol accesible o texto visible.","Confirmada S/ 50 · rechazada S/ 90 · pendiente S/ 20","3 intenciones, confirmado S/ 50.00 (no suma rechazadas ni pendientes), 1 pendiente","Igual al esperado (1 prueba)","✅ Aprobado","Media","HU-07","frontend/test/History.test.tsx"
+"CP-UNI-HIS-008","Historial vacío y proyecto desconocido","AVL, CE","1. Renderizar el Historial con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Cargar una lista vacía; luego una donación de un proyecto que no está en el catálogo.
+3. Verificar el resultado por rol accesible o texto visible.","[] · projectId sin título","Invita a explorar proyectos · muestra el id del proyecto","Igual al esperado (2 pruebas)","✅ Aprobado","Baja","HU-07","frontend/test/History.test.tsx"
+"CP-UNI-PRY-014","Orden y acciones en la lista de gestión","CU","1. Renderizar Gestión con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Cargar un publicado y un borrador.
+3. Verificar el resultado por rol accesible o texto visible.","PUBLICADO + BORRADOR","Borradores primero; el publicado no tiene botones","Igual al esperado (1 prueba)","✅ Aprobado","Media","HU-08, CA-08.2","frontend/test/Manage.test.tsx"
+"CP-UNI-PRY-015","Validación del formulario de proyecto (CA-08.1)","ECP, AVL, PN","1. Renderizar Gestión con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Abrir «Nuevo proyecto» y guardar con datos inválidos.
+3. Verificar el resultado por rol accesible o texto visible.","Título y descripción vacíos; objetivo 0","Mensajes de validación y ninguna llamada al API","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-08.1","frontend/test/Manage.test.tsx"
+"CP-UNI-PRY-016","Alta de proyecto con objetivo en céntimos","CU","1. Renderizar Gestión con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Completar el formulario y guardar.
+3. Verificar el resultado por rol accesible o texto visible.","Objetivo «1234.5»","createProject con goalAmountCents = 123450","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-08.1","frontend/test/Manage.test.tsx"
+"CP-UNI-PRY-017","Contador de caracteres del título","ECP","1. Renderizar Gestión con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Escribir en el título.
+3. Verificar el resultado por rol accesible o texto visible.","«Hola»","«4/120»","Igual al esperado (1 prueba)","✅ Aprobado","Baja","CA-08.1","frontend/test/Manage.test.tsx"
+"CP-UNI-PRY-018","Publicación con confirmación (CA-08.2)","TE","1. Renderizar Gestión con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Pulsar «Publicar», cancelar; volver a publicar y confirmar.
+3. Verificar el resultado por rol accesible o texto visible.","Borrador «Ollas comunes»","Cancelar no llama al API; «Sí, publicar» llama a publishProject","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-08.2","frontend/test/Manage.test.tsx"
+"CP-UNI-PRY-019","Sin acciones de gestor ante un 403","PN","1. Renderizar Gestión con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Responder 403 al listado.
+3. Verificar el resultado por rol accesible o texto visible.","ApiError 403 (usuario DONANTE)","Alerta genérica y sin botón «Nuevo proyecto»","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-NF02.2","frontend/test/Manage.test.tsx"
+"CP-UNI-AUD-007","Consulta por defecto y etiquetas de resultado","CU","1. Renderizar Auditoría con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Cargar eventos con los tres resultados.
+3. Verificar el resultado por rol accesible o texto visible.","DENIED, SUCCESS, CONFLICT","Consulta AUTHZ_DENIED; muestra «Denegado», «Éxito», «Conflicto»","Igual al esperado (1 prueba)","✅ Aprobado","Alta","HU-10, CA-10.1","frontend/test/Audit.test.tsx"
+"CP-UNI-AUD-008","Actor truncado (seudónimo)","PN","1. Renderizar Auditoría con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Cargar un evento con actorRef de 26 caracteres.
+3. Verificar el resultado por rol accesible o texto visible.","actorRef «a3f9c0ffee0123456789abcdef»","Solo «a3f9c0ffee01…»","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-10.2","frontend/test/Audit.test.tsx"
+"CP-UNI-AUD-009","Filtro por tipo y fecha en ISO 8601","ECP","1. Renderizar Auditoría con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Elegir DONATION_CREATED y una fecha «Desde»; filtrar.
+3. Verificar el resultado por rol accesible o texto visible.","DONATION_CREATED, 2026-11-01T00:00","listAudit con eventType y from en ISO; to sin enviar","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-10.1","frontend/test/Audit.test.tsx"
+"CP-UNI-AUD-010","Tabla de auditoría desplazable con teclado","A11Y","1. Renderizar Auditoría con el API simulado (vi.spyOn) y una sesión de prueba.
+2. Cargar un evento.
+3. Verificar el resultado por rol accesible o texto visible.","—","Región «Tabla de eventos (desplazable)» con tabindex = 0","Igual al esperado (1 prueba)","✅ Aprobado","Media","RNF-HU-06, CA-NF06.2","frontend/test/Audit.test.tsx"
+"CP-UNI-UI-001","Categoría visual del proyecto","ECP","1. Clasificar títulos y descripciones con categoryOf.","Útiles, biblioteca, comedor, ollas, vacunación, arborización…","educación / alimentación / salud / otro (primera regla gana)","Igual al esperado (11 pruebas)","✅ Aprobado","Baja","HU-01","frontend/test/category.test.ts"
+"CP-UNI-UI-002","Porcentaje y valor accesible de la barra (CA-09.1)","AVL, ECP","1. Renderizar ProgressBar con distintos avances.","0%, 2%, 65%, 100%; meta 0","aria-valuenow, texto del porcentaje y aria-valuetext correctos; meta 0 sin división por cero","Igual al esperado (6 pruebas)","✅ Aprobado","Alta","HU-09, CA-09.1","frontend/test/ProgressBar.test.tsx"
+"CP-UNI-UI-003","Barra con la meta superada","AVL","1. Renderizar ProgressBar con 150%.","Confirmado S/ 1,500 de S/ 1,000","Texto «150%»; barra limitada al 100%","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-09.1","frontend/test/ProgressBar.test.tsx"
+"CP-UNI-UI-004","Barra compatible con la CSP (sin estilos en línea)","PN, CE","1. Renderizar ProgressBar.
+2. Inspeccionar el HTML generado.","65% y 0%","Relleno con el atributo SVG width; ningún style=; sin avance no hay relleno","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","RNF-HU-11, CA-NF11.2","frontend/test/ProgressBar.test.tsx"
+"CP-UNI-UI-005","Aviso de prototipo y Ley 29733 (CA-NF10.2)","CU","1. Renderizar el Layout.","—","«Prototipo académico — sin pagos reales» y la cita de la Ley N.º 29733","Igual al esperado (1 prueba)","✅ Aprobado","Alta","RNF-HU-10, CA-NF10.2","frontend/test/Layout.test.tsx"
+"CP-UNI-UI-006","Enlace para saltar al contenido (CA-NF06.2)","A11Y","1. Renderizar el Layout.","—","Enlace «Saltar al contenido» hacia #contenido","Igual al esperado (1 prueba)","✅ Aprobado","Media","RNF-HU-06, CA-NF06.2","frontend/test/Layout.test.tsx"
+"CP-UNI-UI-007","Menú según grupo y botón de inicio de sesión","TD","1. Renderizar el Layout como GESTOR y sin sesión.","groups = [GESTOR] · sin sesión","Solo «Gestionar» · botón «Iniciar sesión»","Igual al esperado (2 pruebas)","✅ Aprobado","Media","HU-04, CA-NF02.2","frontend/test/Layout.test.tsx"
+"CP-UNI-UI-008","Formato de importes en soles","ECP","1. Formatear céntimos con formatPEN.","2500, 100000, 1.5","«S/ 25.00», «S/ 1,000.00»; rechaza importes no enteros","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","CA-09.1","frontend/test/money.test.ts"
+"CP-UNI-UI-009","Conversión de soles a céntimos sin coma flotante","ECP, AVL, PN","1. Convertir cadenas con parsePENToCents.","25, 25.5, 25,50, 0.10, 1000.00, 10.555, -5, abc, «», 1e3, 12.3.4, 0.29","Céntimos exactos o null para entradas inválidas (0.29 → 29)","Igual al esperado (12 pruebas)","✅ Aprobado","Alta","CA-05.1, CA-05.2","frontend/test/money.test.ts"
+"CP-IAC-COG-001","Cognito con MFA TOTP y trigger de preautenticación","TD","1. Cargar infra/template.yaml con el esquema de CloudFormation.
+2. Inspeccionar los recursos y propiedades del caso.","infra/template.yaml","MFA OPTIONAL solo TOTP (sin SMS); PreAuthentication → PreAuthFn","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","HU-11, CA-11.1, T14","infra/test/template.test.ts"
+"CP-IAC-COG-002","App client de la SPA seguro","PC","1. Cargar infra/template.yaml con el esquema de CloudFormation.
+2. Inspeccionar los recursos y propiedades del caso.","infra/template.yaml","Sin secreto, solo code (PKCE), sin password auth ni scope admin; admin-cli sin OAuth","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","CA-03.1","infra/test/template.test.ts"
+"CP-IAC-COG-003","Tokens de vida corta con revocación","AVL","1. Cargar infra/template.yaml con el esquema de CloudFormation.
+2. Inspeccionar los recursos y propiedades del caso.","infra/template.yaml","Access token ≤ 15 min y revocación habilitada","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-03.3, CA-03.4","infra/test/template.test.ts"
+"CP-IAC-API-001","JWT authorizer y scopes en toda ruta protegida (PEP)","TD","1. Cargar infra/template.yaml con el esquema de CloudFormation.
+2. Inspeccionar los recursos y propiedades del caso.","infra/template.yaml","Issuer del pool y audience = client de la SPA; toda ruta no pública declara JwtAuthorizer + AuthorizationScopes","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","CA-NF02.1, CA-03.2","infra/test/template.test.ts"
+"CP-IAC-API-002","Throttling y retención de logs","ECP","1. Cargar infra/template.yaml con el esquema de CloudFormation.
+2. Inspeccionar los recursos y propiedades del caso.","infra/template.yaml","20 rps / ráfaga 40; todos los log groups con 14 días","Igual al esperado (2 pruebas)","✅ Aprobado","Media","RNF-HU-07, CA-NF07.1","infra/test/template.test.ts"
+"CP-IAC-IAM-001","Mínimo privilegio por función (T10)","TD, PN","1. Cargar infra/template.yaml con el esquema de CloudFormation.
+2. Inspeccionar los recursos y propiedades del caso.","infra/template.yaml","Un rol por función; ningún Allow con Action/Resource '*' (salvo userpool/* de PreAuthFn); la función pública no escribe; auditoría solo lee","Igual al esperado (4 pruebas)","✅ Aprobado","Alta","RNF-HU-03, CA-NF03.1, CA-NF03.2, T10","infra/test/template.test.ts"
+"CP-IAC-SIM-001","Simulación solo en el stage academic (CA-06.1)","TD","1. Cargar infra/template.yaml con el esquema de CloudFormation.
+2. Inspeccionar los recursos y propiedades del caso.","infra/template.yaml","SimulateDonationFn, su rol y log group con Condition IsAcademic","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-06.1","infra/test/template.test.ts"
+"CP-IAC-WEB-001","Frontend privado tras CloudFront con cabeceras de seguridad","PC","1. Cargar infra/template.yaml con el esquema de CloudFormation.
+2. Inspeccionar los recursos y propiedades del caso.","infra/template.yaml","Bucket privado y cifrado; OAC + HTTPS obligatorio sin Lambda@Edge; CSP, HSTS, nosniff y Referrer-Policy","Igual al esperado (3 pruebas)","✅ Aprobado","Alta","RNF-HU-01, RNF-HU-11, CA-NF01.1, CA-NF11.2","infra/test/template.test.ts"
+"CP-IAC-DDB-001","Tablas on-demand eliminables y TTL de idempotencia","ECP","1. Cargar infra/template.yaml con el esquema de CloudFormation.
+2. Inspeccionar los recursos y propiedades del caso.","infra/template.yaml","PAY_PER_REQUEST, eliminables con sam delete; TTL en expiresAt","Igual al esperado (2 pruebas)","✅ Aprobado","Media","RNF-HU-04, CA-NF08.2","infra/test/template.test.ts"
+"CP-INT-DON-001","10 confirmaciones concurrentes de la misma donación (T08)","CON, TE","1. Exportar API_URL, DONOR_TOKEN y PROJECT_ID del stage academic.
+2. Ejecutar npm run test:concurrency -w backend.
+3. Crear una donación y enviar 10 POST /simulate CONFIRM en paralelo; leer /stats antes y después.","10 solicitudes simultáneas sobre una donación PENDIENTE","Exactamente 1 × 200 y 9 × 409; el acumulado sube una sola vez","Omitida en esta corrida: requiere el stage academic (API_URL, DONOR_TOKEN, PROJECT_ID). Evidencia pendiente (T081). La lógica está cubierta por CP-UNI-SIM-004.","⏭️ Omitido","Alta","HU-06, CA-06.2, CA-NF04.1, CA-NF04.2, T08","backend/test/integration/concurrency.test.ts"
+"CP-E2E-CAT-001","El catálogo lista solo proyectos publicados con meta, confirmado y porcentaje (T01)","CU, ECP","1. Abrir / como visitante.
+2. Contar tarjetas y leer la primera.","4 publicados + 1 borrador en el backend","4 tarjetas, sin el borrador; S/ 9,750.00 de S/ 15,000.00 · 65%; barra dibujada (ancho > 0)","Igual al esperado (2 pruebas; escritorio y móvil 375 px)","✅ Aprobado","Alta","HU-01, CA-01.1, CA-01.2, T01","tests/e2e/publico.spec.ts"
+"CP-E2E-CAT-002","Indicadores agregados en la portada","CU","1. Abrir /.
+2. Leer los tres indicadores de la portada.","Catálogo de prueba","4 proyectos activos · «1 de 4» metas · S/ 24,050.00 confirmado","Igual al esperado (1 prueba)","✅ Aprobado","Media","HU-09, CA-09.1","tests/e2e/publico.spec.ts"
+"CP-E2E-CAT-003","Búsqueda sin distinguir tildes ni mayúsculas","ECP","1. Buscar «UTILES».
+2. Buscar un texto inexistente.
+3. Pulsar «Limpiar filtros».","«UTILES», «xyz-no-existe»","1 resultado · estado vacío · vuelven los 4","Igual al esperado (1 prueba)","✅ Aprobado","Media","HU-01","tests/e2e/publico.spec.ts"
+"CP-E2E-CAT-004","Filtro por categoría y orden por avance","ECP","1. Filtrar por Educación.
+2. Volver a Todas y ordenar por «más cerca» y «necesitan más apoyo».","Categoría Educación; órdenes «cerca» y «apoyo»","2 resultados con aria-pressed; primero Yura (100%) y luego Socabaya (12%)","Igual al esperado (1 prueba)","✅ Aprobado","Media","HU-01","tests/e2e/publico.spec.ts"
+"CP-E2E-CAT-005","Catálogo vacío","AVL","1. Dejar el backend sin proyectos publicados.
+2. Abrir /.","0 publicados","«Aún no hay proyectos publicados»","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-01.3","tests/e2e/publico.spec.ts"
+"CP-E2E-CAT-006","Error 500 del API: mensaje genérico y reintento","CE, PN","1. Hacer fallar GET /v1/projects 3 veces con un ARN en el mensaje.
+2. Abrir /.
+3. Pulsar «Reintentar».","500 «arn:aws:dynamodb:…»","«Ocurrió un error inesperado» sin «arn:aws»; al reintentar aparecen los 4 proyectos","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-01.3, CA-NF06.2","tests/e2e/publico.spec.ts"
+"CP-E2E-CAT-007","Detalle con objetivo, lo que falta y botón para donar","CU","1. Abrir / y pulsar la tarjeta del comedor.
+2. Leer el panel «Apoya este proyecto».","Comedor: meta S/ 24,000, confirmado S/ 4,800","URL del proyecto; falta S/ 19,200.00; barra 20%; «Inicia sesión para donar» habilitado","Igual al esperado (2 pruebas; escritorio y móvil 375 px)","✅ Aprobado","Alta","HU-02, HU-09, CA-02.1, CA-09.1","tests/e2e/publico.spec.ts"
+"CP-E2E-CAT-008","Proyecto en borrador o inexistente","ECP, PN","1. Abrir /projects/{id del borrador}.
+2. Abrir /projects/no-existe.","Borrador · id inexistente","«Proyecto no encontrado» en ambos","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-02.2","tests/e2e/publico.spec.ts"
+"CP-E2E-CAT-009","Ruta desconocida","PN","1. Abrir /ruta/que/no/existe.
+2. Pulsar «Ir al catálogo».","URL inexistente","«Página no encontrada» y regreso a /","Igual al esperado (1 prueba)","✅ Aprobado","Baja","RNF-HU-06","tests/e2e/publico.spec.ts"
+"CP-E2E-CAT-010","Meta alcanzada en el detalle","AVL","1. Abrir el detalle de la campaña de Yura.","Confirmado = meta (S/ 8,000)","«100%», «Meta alcanzada» y barra de ancho completo","Igual al esperado (1 prueba)","✅ Aprobado","Media","HU-09, CA-09.1","tests/e2e/publico.spec.ts"
+"CP-E2E-AUT-001","Inicio de sesión con Authorization Code + PKCE S256","CU, PC","1. Pulsar «Iniciar sesión».
+2. Cognito simulado recibe /authorize y canjea el código en /token verificando SHA-256(code_verifier) = code_challenge.","Usuario DONANTE","response_type=code, client_id, S256, challenge de 43 caracteres, state, redirect /callback y scopes de la API; PKCE válido","Igual al esperado (1 prueba)","✅ Aprobado","Alta","HU-03, CA-03.1","tests/e2e/auth.spec.ts"
+"CP-E2E-AUT-002","Sin tokens en localStorage ni sessionStorage tras iniciar sesión","PN","1. Iniciar sesión.
+2. Volcar localStorage y sessionStorage.","access, id y refresh token emitidos","Ninguno de los tres tokens ni un JWT («eyJ…») en el almacenamiento","Igual al esperado (1 prueba)","✅ Aprobado","Alta","RNF-HU-11, CA-NF11.1","tests/e2e/auth.spec.ts"
+"CP-E2E-AUT-003","Recargar descarta la sesión (tokens en memoria)","TE","1. Iniciar sesión.
+2. Recargar la página.","Sesión de DONANTE","Vuelve a mostrarse «Iniciar sesión» y desaparece «Mis donaciones»","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-NF11.1","tests/e2e/auth.spec.ts"
+"CP-E2E-AUT-004","Ruta protegida sin sesión y regreso a la ruta pedida","CU","1. Abrir /donations sin sesión.
+2. Pulsar «Iniciar sesión» del contenido.","Visitante","«Necesitas iniciar sesión…»; tras el login vuelve a /donations con el historial","Igual al esperado (1 prueba)","✅ Aprobado","Media","HU-03","tests/e2e/auth.spec.ts"
+"CP-E2E-AUT-005","«Inicia sesión para donar» vuelve al formulario","CU","1. Abrir el detalle sin sesión.
+2. Pulsar «Inicia sesión para donar».","Visitante","Tras el login se abre /projects/{id}/donate","Igual al esperado (1 prueba)","✅ Aprobado","Media","HU-03, HU-05","tests/e2e/auth.spec.ts"
+"CP-E2E-AUT-006","Cerrar sesión revoca el refresh token","CU","1. Iniciar sesión.
+2. Pulsar «Cerrar sesión».","Sesión activa","POST /oauth2/revoke con el refresh token; paso por /logout con client_id y logout_uri; vuelve «Iniciar sesión»","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-03.3","tests/e2e/auth.spec.ts"
+"CP-E2E-AUT-007","Menú según el grupo (solo UX)","TD","1. Iniciar sesión con cada rol.
+2. Revisar la navegación principal.","DONANTE · GESTOR · AUDITOR","Cada rol ve solo su opción (Mis donaciones / Gestionar / Auditoría)","Igual al esperado (3 pruebas)","✅ Aprobado","Media","HU-04, CA-NF02.2","tests/e2e/auth.spec.ts"
+"CP-E2E-AUT-008","Cognito rechaza el canje del código","PN","1. Configurar /token para responder invalid_grant.
+2. Intentar iniciar sesión.","invalid_grant","«No se pudo completar el inicio de sesión»; sin sesión ni tokens","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-03.1","tests/e2e/auth.spec.ts"
+"CP-E2E-DON-001","Flujo completo del donante (T05)","CU, TE","1. Iniciar sesión y abrir el proyecto.
+2. Elegir S/ 50 y registrar la intención.
+3. Confirmar la simulación.
+4. Abrir el historial.","DONANTE, monto sugerido S/ 50","Pendiente → «¡Gracias por tu apoyo!» con «Confirmada (simulada)»; total S/ 9,800.00; primera fila del historial con S/ 50.00; aviso de que no hubo cobro","Igual al esperado (2 pruebas; escritorio y móvil 375 px)","✅ Aprobado","Alta","HU-05, HU-06, HU-07, HU-09, CA-05.1, CA-06.1, CA-06.4, T05","tests/e2e/donacion.spec.ts"
+"CP-E2E-DON-002","Rechazar la simulación no suma al total","TE","1. Abrir una donación pendiente.
+2. Pulsar «Rechazar simulación».","Donación pendiente del comedor","«Rechazada (simulada)»; total del proyecto sin cambios (S/ 4,800.00)","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-06.3","tests/e2e/donacion.spec.ts"
+"CP-E2E-DON-003","Montos inválidos en el navegador (T04)","AVL, ECP, PN","1. Escribir el monto.
+2. Pulsar «Registrar intención».","0 · 0.99 · 1000.01 · 10.555 · abc","Alerta accesible, aria-invalid y ninguna llamada POST /v1/donations","Igual al esperado (5 pruebas)","✅ Aprobado","Alta","CA-05.2, T04","tests/e2e/donacion.spec.ts"
+"CP-E2E-DON-004","Límites válidos del monto","AVL","1. Registrar S/ 1 y S/ 1000.","1 · 1000","Se registran como 100 y 100000 céntimos","Igual al esperado (2 pruebas)","✅ Aprobado","Alta","CA-05.1","tests/e2e/donacion.spec.ts"
+"CP-E2E-DON-005","Contenido exacto de la solicitud de donación","PC","1. Registrar S/ 25.50.
+2. Inspeccionar la solicitud recibida por el API.","25.50","Bearer = access token emitido; Idempotency-Key UUID; cuerpo { projectId, amountCents: 2550 }","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-05.1, CA-05.3, CA-05.5","tests/e2e/donacion.spec.ts"
+"CP-E2E-DON-006","Reintento tras fallo de red: misma clave, una sola donación (T06)","CE","1. Abortar en la red el primer POST.
+2. Registrar S/ 30, ver el error y volver a pulsar.","Fallo de red en el 1.er intento","«No pudimos conectar con el servicio»; 2 POST con la misma Idempotency-Key; 1 donación creada","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-05.4, T06","tests/e2e/donacion.spec.ts"
+"CP-E2E-DON-007","Cambiar el monto tras un fallo genera una clave nueva","CE","1. Fallar el primer POST de S/ 30.
+2. Cambiar a S/ 40 y registrar.","30 → 40","Las dos solicitudes llevan Idempotency-Key distinta (evita el 409 de T07)","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-05.4, T07","tests/e2e/donacion.spec.ts"
+"CP-E2E-DON-008","Historial solo propio y ordenado","CU","1. Abrir /donations como donante1.
+2. Abrir la primera fila.","3 donaciones propias + 1 de donante2","3 filas de la más reciente a la más antigua (la ajena no aparece) y enlace al detalle","Igual al esperado (2 pruebas; escritorio y móvil 375 px)","✅ Aprobado","Alta","HU-07, CA-07.1","tests/e2e/donacion.spec.ts"
+"CP-E2E-DON-009","Donación terminal sin opción de simular","TE","1. Abrir una donación confirmada.","CONFIRMADA_SIMULADA","Ningún botón de simulación","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-06.2","tests/e2e/donacion.spec.ts"
+"CP-E2E-DON-010","El formulario solo pide el monto","PN","1. Abrir el formulario de donación.","—","Un único campo de texto; nada de tarjeta, CVV, cuenta ni DNI; aviso de simulación","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-05.5, CA-NF10.2","tests/e2e/donacion.spec.ts"
+"CP-E2E-PRY-001","Crear proyecto: validación y alta como borrador","ECP, CU","1. Abrir «Nuevo proyecto» y guardar vacío.
+2. Completar y guardar.","Vacío · «Taller de computación en Cayma», S/ 2500","Tres mensajes de validación sin POST; luego tarjeta «Borrador» y POST con goalAmountCents = 250000","Igual al esperado (1 prueba)","✅ Aprobado","Alta","HU-08, CA-08.1","tests/e2e/gestor.spec.ts"
+"CP-E2E-PRY-002","Editar un borrador","CU","1. Pulsar «Editar» en el borrador.
+2. Cambiar título y objetivo; guardar.","«Ollas comunes en ASA», S/ 7000","Formulario precargado (6000.00); tarjeta actualizada; PATCH con goalAmountCents = 700000","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-08.1","tests/e2e/gestor.spec.ts"
+"CP-E2E-PRY-003","Publicar con confirmación y verlo en el catálogo","TE","1. Pulsar «Publicar» y cancelar.
+2. Publicar y confirmar.
+3. Ir a Proyectos.","Borrador «Ollas comunes…»","Cancelar no llama al API; confirmar lo marca «Publicado» y aparece en el catálogo público","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-08.2","tests/e2e/gestor.spec.ts"
+"CP-E2E-PRY-004","Borradores primero y publicados sin acciones","CU","1. Abrir /manage.","1 borrador + 4 publicados","La primera tarjeta es el borrador; un publicado no tiene botones","Igual al esperado (2 pruebas; escritorio y móvil 375 px)","✅ Aprobado","Media","CA-08.2","tests/e2e/gestor.spec.ts"
+"CP-E2E-AUD-001","Eventos AUTHZ_DENIED con actor seudonimizado","CU, PN","1. Abrir /audit como AUDITOR.
+2. Leer la tabla.","3 eventos AUTHZ_DENIED","3 filas «Denegado»; actor de 12 caracteres hex + «…»; sin correos, sub ni JWT","Igual al esperado (2 pruebas; escritorio y móvil 375 px)","✅ Aprobado","Alta","HU-10, CA-10.1, CA-10.2","tests/e2e/auditor.spec.ts"
+"CP-E2E-AUD-002","Filtro por tipo y rango en ISO 8601","ECP","1. Elegir DONATION_CREATED, fechas de noviembre y filtrar.","2026-11-01T00:00 a 2026-11-30T23:59 (hora de Lima)","1 fila; query con eventType, from = 2026-11-01T05:00:00.000Z y to en UTC","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-10.1","tests/e2e/auditor.spec.ts"
+"CP-E2E-AUD-003","Filtro sin resultados","ECP","1. Elegir PROJECT_UPDATED y filtrar.","Tipo sin eventos","«Sin eventos para el filtro seleccionado»","Igual al esperado (1 prueba)","✅ Aprobado","Baja","CA-10.1","tests/e2e/auditor.spec.ts"
+"CP-E2E-AZN-001","DONANTE abre /manage: 403 sin datos ni acciones (T03)","PN, TD","1. Iniciar sesión como DONANTE en /manage.","Navegación directa a una ruta de gestor","Alerta genérica; sin borradores ni «Nuevo proyecto»; el API respondió 403 y registró AUTHZ_DENIED","Igual al esperado (1 prueba)","✅ Aprobado","Alta","HU-04, CA-04.1, CA-NF02.2, T03","tests/e2e/autorizacion.spec.ts"
+"CP-E2E-AZN-002","GESTOR abre /donations: 403 (T12)","PN, TD","1. Iniciar sesión como GESTOR en /donations.","Navegación directa","Alerta genérica; GET /v1/donations/me → 403","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-04.2, T12","tests/e2e/autorizacion.spec.ts"
+"CP-E2E-AZN-003","AUDITOR abre /manage: 403","PN, TD","1. Iniciar sesión como AUDITOR en /manage.","Navegación directa","Alerta genérica; GET /v1/manage/projects → 403","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-04.1","tests/e2e/autorizacion.spec.ts"
+"CP-E2E-AZN-004","Donación ajena: el mismo mensaje que una inexistente (T09)","PN","1. Abrir /donations/{id de donante2} como donante1.","donationId ajeno","Alerta genérica sin el importe; el API respondió 404","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-07.2, T09","tests/e2e/autorizacion.spec.ts"
+"CP-E2E-AZN-005","La SPA nunca envía identidad ni rol al API (CA-04.3)","PN, PC","1. Donar y confirmar como DONANTE.
+2. Revisar cuerpo, query y cabeceras (salvo Authorization) de todas las solicitudes.","Flujo completo","Ninguna solicitud contiene sub, donorSub, groups, role ni el nombre del grupo","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-04.3","tests/e2e/autorizacion.spec.ts"
+"CP-E2E-SEG-001","CSP de CloudFront: barras visibles y estilos en línea bloqueados","PN, PC","1. Servir el documento con la CSP leída de infra/template.yaml.
+2. Medir la barra de progreso.
+3. Inyectar un atributo style y observar la consola.","CSP de producción (style-src 'self')","Cabecera presente; barra con ancho > 0; el estilo inyectado se bloquea y se detecta. Además, TODAS las pruebas E2E fallan si hay una violación CSP","Igual al esperado (1 prueba)","✅ Aprobado","Alta","RNF-HU-11, CA-NF11.2","tests/e2e/seguridad.spec.ts"
+"CP-E2E-SEG-002","La SPA solo se conecta a su origen, al API y a Cognito","PN","1. Registrar el origen de cada solicitud durante el login y la donación.","Flujo de donante","Ningún origen fuera de la lista permitida (connect-src)","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-NF11.2","tests/e2e/seguridad.spec.ts"
+"CP-E2E-SEG-003","Token rechazado por el servidor (401)","PN","1. Iniciar sesión.
+2. Invalidar el token en el servidor y abrir «Mis donaciones».","Token revocado/inválido","«Tu sesión expiró o no es válida. Inicia sesión nuevamente.»","Igual al esperado (1 prueba)","✅ Aprobado","Alta","CA-03.2, CA-03.4","tests/e2e/seguridad.spec.ts"
+"CP-E2E-SEG-004","Limitación de tasa (429)","PN","1. Responder 429 al catálogo con un ARN en el mensaje.","429","«Demasiadas solicitudes…» sin «arn:aws»","Igual al esperado (1 prueba)","✅ Aprobado","Media","RNF-HU-07","tests/e2e/seguridad.spec.ts"
+"CP-E2E-SEG-005","Aviso de simulación y Ley 29733 en todas las pantallas","CU","1. Abrir cada ruta.","/, detalle, /donations, ruta inexistente","Aviso «Prototipo académico — sin pagos reales…» y cita de la Ley N.º 29733 visibles","Igual al esperado (4 pruebas)","✅ Aprobado","Alta","RNF-HU-10, CA-NF10.2","tests/e2e/seguridad.spec.ts"
+"CP-E2E-ACC-001","Sin violaciones WCAG 2.2 A/AA (axe-core)","A11Y","1. Abrir cada pantalla con el rol que corresponde.
+2. Analizar con axe-core (wcag2a, wcag2aa, wcag21a/aa, wcag22aa).","Catálogo, detalle, donar, resultado, historial, gestión y auditoría · 1280 px y 375 px","0 violaciones en las 7 pantallas y ambos tamaños","Igual al esperado (14 pruebas; escritorio y móvil 375 px)","✅ Aprobado","Alta","RNF-HU-06, CA-NF06.1, CA-NF06.2","tests/e2e/accesibilidad.spec.ts"
+"CP-E2E-ACC-002","Sin desplazamiento horizontal","A11Y, AVL","1. Abrir cada pantalla.
+2. Comparar scrollWidth con clientWidth.","7 pantallas · 1280 px y 375 px","scrollWidth ≤ clientWidth (WCAG 1.4.10 Reflow)","Igual al esperado (14 pruebas; escritorio y móvil 375 px)","✅ Aprobado","Alta","RNF-HU-06, CA-NF06.1","tests/e2e/accesibilidad.spec.ts"
+"CP-E2E-ACC-003","«Saltar al contenido» con teclado","A11Y","1. Abrir /, pulsar Tab y Enter.","Teclado","El primer foco es el enlace; Enter mueve el foco a main#contenido","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-NF06.2","tests/e2e/accesibilidad.spec.ts"
+"CP-E2E-ACC-004","Donar solo con teclado","A11Y, CU","1. Enfocar «S/ 100» y pulsar Espacio.
+2. Enfocar «Registrar intención» y pulsar Enter.","Teclado","aria-pressed = true; intención registrada; «Confirmar simulación» disponible","Igual al esperado (1 prueba)","✅ Aprobado","Media","CA-NF06.2","tests/e2e/accesibilidad.spec.ts"
+"CP-E2E-PRD-001","Producción: HTTPS y cabeceras de seguridad","PC","1. npm run e2e:produccion -- https://<distribución>.cloudfront.net
+2. Leer las cabeceras del documento.","Frontend desplegado (solo lectura, sin sesión)","https; HSTS, nosniff, X-Frame-Options DENY, Referrer-Policy y CSP con style-src 'self'","Igual al esperado (1 prueba)","✅ Aprobado","Alta","RNF-HU-01, CA-NF01.1, CA-NF11.2","tests/e2e/produccion.spec.ts"
+"CP-E2E-PRD-002","Producción: el catálogo carga del API real","CU","1. Abrir / en CloudFront.","Frontend y API desplegados","Tarjetas o estado vacío, sin alertas de error","Igual al esperado (1 prueba)","✅ Aprobado","Alta","HU-01, T01","tests/e2e/produccion.spec.ts"
+"CP-E2E-PRD-003","Producción: sin violaciones de la CSP real y barras dibujadas","PN","1. Abrir / en CloudFront.
+2. Medir el relleno de la primera barra y revisar la consola.","CSP real de CloudFront","Relleno > 0 si el avance es > 0; 0 violaciones CSP","Igual al esperado (1 prueba)","✅ Aprobado","Alta","RNF-HU-11, CA-NF11.2","tests/e2e/produccion.spec.ts"
+"CP-AWS-IAM-001","La Lambda de listado no puede escribir en DynamoDB (T10)","PN, TD","1. Ejecutar scripts/simulate-t10.ps1 (IAM SimulatePrincipalPolicy, solo lectura) con contexto aws:RequestedRegion y aws:SecureTransport.
+2. Revisar las 7 políticas en línea.","PublicProjectsRole × GetItem, Query, PutItem, UpdateItem, DeleteItem, BatchWriteItem, Scan, otras tablas","Lectura permitida; escritura y otras tablas implicitDeny","Igual al esperado: GetItem y Query allowed; PutItem, UpdateItem, DeleteItem, BatchWriteItem, Scan y otras tablas implicitDeny (2026-11-11). Hallazgo: sin contexto las SCP administradas devuelven explicitDeny.","✅ Aprobado","Alta","RNF-HU-03, CA-NF03.1, CA-NF03.2, T10","evidence/T10-minimo-privilegio.md"
+"CP-AWS-SES-001","Token revocado usado antes de expirar (T13)","TE","1. Ejecutar scripts/t13-revocacion.sh con un DONANTE ficticio.
+2. Llamar al API antes y después de revocar, y después del vencimiento.","Access token de 900 s + refresh token revocado","Aceptado hasta expirar (limitación documentada); rechazado después","Igual al esperado: 200 antes y después de revocar, invalid_grant al renovar, 401 «token has expired» al vencer; ventana de exposición 14 min 41 s.","✅ Aprobado","Alta","HU-03, CA-03.3, CA-03.4, T13","evidence/T13-revocacion.md"
+"CP-AWS-MFA-001","GESTOR sin segundo factor no obtiene tokens (T14)","PN","1. Crear gestor-sin-mfa@example.com en GESTOR sin TOTP.
+2. Iniciar sesión desde la SPA.
+3. Verificar con admin-get-user.","GESTOR sin TOTP","Managed login rechaza la autenticación; sin redirección a /callback ni tokens","Igual al esperado: «PreAuthentication failed… requieren MFA TOTP configurado»; sin tokens ni /callback.","✅ Aprobado","Alta","HU-11, CA-11.1, CA-11.2, T14","evidence/T14-mfa-gestor.md"
+"CP-AWS-WEB-001","HTTPS y cabeceras de seguridad en CloudFront (T096)","PC","1. curl -sI http:// y https:// de la distribución.
+2. Revisar el almacenamiento del navegador tras iniciar sesión.","Distribución de CloudFront","301 a HTTPS; HSTS, nosniff, DENY, Referrer-Policy y CSP; sin tokens en el almacenamiento","Igual al esperado en los 5 puntos (2026-11-11).","✅ Aprobado","Alta","RNF-HU-01, RNF-HU-11, CA-NF01.1, CA-NF11.1, CA-NF11.2","evidence/CA-NF11-cabeceras.md"
+"CP-AWS-OBS-001","Logs y trazabilidad (T100)","CU, PN","1. Consultar los log groups y CloudTrail por CLI de solo lectura.
+2. Ubicar un 2xx, un 401 y un 403 por requestId.","Pila zerotrust-lab04","Retención 14 días; JSON con requestId, action, outcome, statusCode, durationMs; sin datos sensibles; AUTHZ_DENIED en el 403; evento de CloudTrail","Igual al esperado (2026-11-11).","✅ Aprobado","Media","RNF-HU-07, CA-NF07.1, CA-NF07.2, CA-NF01.2","evidence/RNF-HU-07-observabilidad.md"
+"CP-AWS-GIT-001","Protección de main y detección de secretos (T007)","PC","1. Revisar el ruleset de main y la configuración de seguridad del repositorio.","Repositorio en GitHub","PR con 1 aprobación, sin excepciones; secret scanning activo; CI obligatorio","Aprobado con observación: ruleset activo, 1 aprobación y secret scanning con captura; que el CI sea obligatorio no aparece en las capturas.","✅ Aprobado","Media","CA-NF01.2, CA-NF08.1","evidence/T007-proteccion-main.md"
+"CP-AWS-AUT-001","Sin token, token alterado o ID token contra el API desplegado (T02, T11)","PN","1. Ejecutar la carpeta 1-auth de la colección Bruno contra academic.","Sin Authorization · JWT alterado · ID token","401 en todos los casos","Pendiente de ejecutar en AWS (T037). Cubierto en unitarias por CP-UNI-AUT-001/002 y en IaC por CP-IAC-API-001.","⏳ Pendiente","Alta","CA-03.2, CA-NF02.1, T02, T11","tests/api/1-auth"
+"CP-AWS-AZN-001","Denegaciones por rol y propietario en el API desplegado (T03, T09, T12)","TD, PN","1. Ejecutar las carpetas 3-donations y 4-authz de Bruno con tokens de cada rol.","DONANTE crea proyecto · donación ajena · GESTOR lee historial","403 · 404 sin filtración · 403/404","Pendiente de ejecutar en AWS (T074). Cubierto en unitarias (CP-UNI-AZN-003…008) y vía SPA (CP-E2E-AZN-001…004).","⏳ Pendiente","Alta","CA-04.1, CA-04.2, CA-07.2, T03, T09, T12","tests/api/4-authz"
+"CP-AWS-DON-001","Flujo de donación en el API desplegado (T01, T04–T07)","CU, AVL, PN","1. Ejecutar las carpetas 2-projects y 3-donations de Bruno con un DONANTE.","Montos válidos e inválidos; repetición de Idempotency-Key","200/201, 400, misma respuesta (T06) y 409 (T07)","Pendiente de ejecutar con Bruno en AWS. Cubierto en unitarias (CP-UNI-DON-001…015).","⏳ Pendiente","Alta","T01, T04, T05, T06, T07","tests/api/3-donations"
+"CP-AWS-AVP-001","Autorización externalizada con Verified Permissions (HU-12)","TD","1. Desplegar con AUTHZ_ENGINE=avp.
+2. Repetir T03, T09 y T12 y comparar con el motor embebido.","Policy store con policies/*.cedar","Mismas respuestas que con el motor embebido","Pendiente (T093). Equivalencia verificada en unitarias con evaluador simulado (CP-UNI-AZN-001).","⏳ Pendiente","Media","HU-12, CA-12.1, CA-12.2","evidence/HU-12-comparacion.md (por crear)"
+"CP-AWS-PER-001","Rendimiento p95 del catálogo (RNF-HU-05)","AVL","1. Cargar 50 proyectos ficticios.
+2. Medir el p95 de GET excluyendo la primera llamada (scripts/measure-perf.mjs).","50 proyectos, N solicitudes","p95 dentro del umbral de CA-NF05.1 con método y condiciones registrados","Pendiente (T098).","⏳ Pendiente","Media","RNF-HU-05, CA-NF05.1, CA-NF05.2","tests/manual/RNF-HU-05-rendimiento.md"
+"CP-AWS-ACC-001","Auditoría manual de accesibilidad (lector de pantalla, Lighthouse)","A11Y","1. Recorrer catálogo, detalle, donar y resultado con lector de pantalla y teclado.
+2. Ejecutar Lighthouse en móvil.","Frontend desplegado","Criterios WCAG 2.2 AA documentados sin bloqueos","Pendiente (T099). La parte automatizable ya pasa: CP-E2E-ACC-001…004 (axe, reflow 375 px y teclado).","⏳ Pendiente","Media","RNF-HU-06, CA-NF06.1, CA-NF06.2","tests/manual/RNF-HU-06-accesibilidad.md"
+"CP-AWS-DEM-001","Quickstart completo y demo con los cuatro roles (T105)","CU","1. Ejecutar los escenarios 1–12 de quickstart.md con usuarios ficticios de los 4 roles.","Visitante, DONANTE, GESTOR (TOTP), AUDITOR (TOTP)","Todos los escenarios con el resultado esperado","Pendiente (T105).","⏳ Pendiente","Alta","SC-001, SC-009","specs/001-donaciones-seguras/quickstart.md"
+"CP-AWS-LIM-001","Limpieza de la cuenta tras la evaluación (T106)","PC","1. Vaciar el bucket, sam delete y verificar con scripts/verify-cleanup.sh (us-east-2 y logs en us-east-1).","Pila zerotrust-lab04","Sin recursos de la pila en la cuenta","Pendiente: se ejecuta después de la demo y la evaluación.","⏳ Pendiente","Media","RNF-HU-09, CA-NF09.2","evidence/RNF-HU-09-limpieza.md"

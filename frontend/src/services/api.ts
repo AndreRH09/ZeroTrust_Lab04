@@ -26,7 +26,8 @@ export class ApiError extends Error {
 
 /** Mensaje para el usuario, sin detalles técnicos (CA-01.3, CA-NF06.2). */
 export function userMessage(err: unknown): string {
-  if (!(err instanceof ApiError)) return "No pudimos conectar con el servicio. Inténtalo de nuevo.";
+  if (!(err instanceof ApiError) || err.status === 0)
+    return "No pudimos conectar con el servicio. Inténtalo de nuevo.";
   switch (err.status) {
     case 400:
       return err.message || "Revisa los datos enviados.";

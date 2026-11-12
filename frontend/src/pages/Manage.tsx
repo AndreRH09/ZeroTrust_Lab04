@@ -212,7 +212,9 @@ export function Manage() {
         title="Gestión de proyectos"
         description="Crea borradores y publícalos cuando estén listos. Un proyecto publicado ya no se puede editar."
         actions={
-          editing === null && (
+          // Solo si el servidor autorizó el listado: con 403 no se ofrecen acciones de gestor.
+          editing === null &&
+          list.isSuccess && (
             <button type="button" className={btnPrimary} onClick={() => setEditing("new")}>
               <PlusIcon className="size-4" />
               Nuevo proyecto

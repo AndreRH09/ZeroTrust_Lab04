@@ -47,4 +47,17 @@ describe("cliente API", () => {
     expect(userMessage(new ApiError(429, "X", ""))).toMatch(/Reintenta/);
     expect(userMessage(new ApiError(401, "UNAUTHORIZED", ""))).toMatch(/Inicia sesión/);
   });
+
+  it("fallo de red → ApiError status 0 con mensaje de conexión (regresión hallada en E2E)", async () => {
+    vi.spyOn(window, "fetch").mockRejectedValue(new TypeError("Failed to fetch"));
+    const err = await api.listProjects().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as InstanceType<typeof ApiError>).status).toBe(0);
+    expect(userMessage(err)).toBe("No pudimos conectar con el servicio. Inténtalo de nuevo.");
+  });
+
+  it("500 nunca muestra el mensaje interno del servidor", () => {
+    const err = new ApiError(500, "INTERNAL_ERROR", "arn:aws:dynamodb:us-east-2:1:table/X");
+    expect(userMessage(err)).toBe("Ocurrió un error inesperado. Inténtalo más tarde.");
+  });
 });

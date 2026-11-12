@@ -9,7 +9,11 @@ export default tseslint.config(
     ignores: [
       "**/node_modules/**",
       "**/dist/**",
+      "**/dist-e2e/**",
       "**/coverage/**",
+      "test-results/**",
+      "playwright-report/**",
+      "capturas/**",
       ".aws-sam/**",
       ".specify/**",
       ".claude/**",
@@ -52,7 +56,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["scripts/**/*.mjs", "**/build.mjs", "**/test/**/*.{ts,tsx}"],
+    files: ["scripts/**/*.mjs", "**/build.mjs", "**/test/**/*.{ts,tsx}", "tests/**/*.{ts,mjs}"],
     rules: { "no-console": "off" },
   },
 );

@@ -14,9 +14,12 @@ const TEST_DIRS = [
   "infra/test",
   "tests/api",
   "tests/manual",
+  "tests/e2e",
 ];
-const TEST_FILE = /(\.test\.tsx?|\.bru|\.md)$/;
-const HELPER = /(helpers|utils|setup)\.tsx?$|README\.md$|collection\.bru$|environments/;
+const TEST_FILE = /(\.test\.tsx?|\.spec\.ts|\.bru|\.md)$/;
+// capturas.spec.ts genera imágenes; no es una prueba de aceptación.
+const HELPER =
+  /(helpers|utils|setup)\.tsx?$|README\.md$|collection\.bru$|environments|capturas\.spec\.ts$/;
 
 function walk(dir) {
   let out = [];

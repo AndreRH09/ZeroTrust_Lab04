@@ -37,7 +37,7 @@ function ProjectCard({ p }: { p: ProjectPublic }) {
           <CategoryTag category={category} />
         </div>
         {reached && (
-          <div className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm">
+          <div className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-emerald-700 px-2.5 py-1 text-xs font-semibold text-white shadow-sm">
             <CheckCircleIcon className="size-3.5" />
             Meta alcanzada
           </div>

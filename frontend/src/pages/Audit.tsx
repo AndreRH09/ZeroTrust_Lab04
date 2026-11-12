@@ -122,7 +122,13 @@ export function Audit() {
           <p aria-live="polite" className="text-sm text-stone-500">
             {events.data.items.length} evento(s) · {AUDIT_EVENT_LABEL[filter.eventType]}
           </p>
-          <div className={`${card} overflow-x-auto`}>
+          {/* Enfocable: en pantallas angostas la tabla se desplaza y debe poder hacerse con teclado (WCAG 2.1.1). */}
+          <div
+            className={`${card} overflow-x-auto`}
+            role="region"
+            aria-label="Tabla de eventos (desplazable)"
+            tabIndex={0}
+          >
             <table className="w-full text-left text-sm">
               <caption className="sr-only">Eventos de auditoría</caption>
               <thead className="border-b border-sand-200 bg-sand-50 text-xs font-semibold tracking-wide text-stone-600 uppercase">
