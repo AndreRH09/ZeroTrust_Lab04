@@ -1,0 +1,39 @@
+meta {
+  name: T03 donante intenta crear proyecto
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{apiUrl}}/v1/projects
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{donorToken}}
+}
+
+body:json {
+  { "title": "Intento no autorizado", "description": "Un donante no puede crear proyectos", "goalAmountCents": 10000 }
+}
+
+script:post-response {
+  const axios = require("axios");
+  const r = await axios({
+    method: "patch",
+    url: bru.getProcessEnv("API_URL") + "/v1/projects/" + bru.getProcessEnv("DRAFT_PROJECT_ID") + "/publish",
+    headers: { Authorization: "Bearer " + bru.getProcessEnv("DONOR_TOKEN") },
+    validateStatus: () => true,
+  });
+  bru.setVar("st_publish", r.status);
+}
+
+tests {
+  test("T03 · CA-04.1 crear → 403", function () { expect(res.getStatus()).to.equal(403); });
+  test("T03 · CA-04.1 publicar → 403", function () { expect(bru.getVar("st_publish")).to.equal(403); });
+}
+
+docs {
+  @trace HU-04, CA-04.1, T03
+}

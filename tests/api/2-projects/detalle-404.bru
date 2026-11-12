@@ -1,0 +1,23 @@
+meta {
+  name: Detalle de borrador o inexistente → 404
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{apiUrl}}/v1/projects/{{draftProjectId}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("CA-02.2 borrador → 404 sin contenido", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().code).to.equal("NOT_FOUND");
+    expect(JSON.stringify(res.getBody())).to.not.contain("BORRADOR");
+  });
+}
+
+docs {
+  @trace HU-02, CA-02.2
+}

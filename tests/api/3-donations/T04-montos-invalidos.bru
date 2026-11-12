@@ -1,0 +1,50 @@
+meta {
+  name: T04 montos inválidos
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{apiUrl}}/v1/donations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{donorToken}}
+}
+
+headers {
+  Idempotency-Key: 0c2a7c55-6a0e-4d7f-9a3b-4f2b1e0d9c01
+}
+
+body:json {
+  { "projectId": "{{projectId}}", "amountCents": 0 }
+}
+
+script:post-response {
+  const axios = require("axios");
+  const { randomUUID } = require("crypto");
+  const send = (amountCents) =>
+    axios({
+      method: "post",
+      url: bru.getProcessEnv("API_URL") + "/v1/donations",
+      data: { projectId: bru.getProcessEnv("PROJECT_ID"), amountCents },
+      headers: { Authorization: "Bearer " + bru.getProcessEnv("DONOR_TOKEN"), "Idempotency-Key": randomUUID() },
+      validateStatus: () => true,
+    }).then((r) => r.status);
+  bru.setVar("st_100001", await send(100001));
+  bru.setVar("st_decimal", await send(1.5));
+  bru.setVar("st_string", await send("100"));
+}
+
+tests {
+  test("T04 · 0 → 400", function () { expect(res.getStatus()).to.equal(400); });
+  test("T04 · 100001 → 400", function () { expect(bru.getVar("st_100001")).to.equal(400); });
+  test("T04 · 1.5 → 400", function () { expect(bru.getVar("st_decimal")).to.equal(400); });
+  test("T04 · '100' → 400", function () { expect(bru.getVar("st_string")).to.equal(400); });
+}
+
+docs {
+  @trace HU-05, CA-05.2, T04
+}

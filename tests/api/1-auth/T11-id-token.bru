@@ -1,0 +1,25 @@
+meta {
+  name: T11 ID token como Bearer
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{apiUrl}}/v1/donations/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+tests {
+  test("T11 · CA-NF02.1 un ID token no tiene scope → 401", function () {
+    expect(res.getStatus()).to.equal(401);
+  });
+}
+
+docs {
+  @trace HU-03, RNF-HU-02, CA-03.2, CA-NF02.1, T11
+}

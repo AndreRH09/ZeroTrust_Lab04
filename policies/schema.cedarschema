@@ -1,0 +1,17 @@
+// Esquema Cedar de referencia (HU-12, CA-12.1). El policy store se crea con validación OFF;
+// este archivo documenta las entidades que envía backend/src/authz/avpPolicy.ts.
+namespace Aqp {
+  entity Group;
+  entity User in [Group] = { sub: String };
+  entity Application;
+  entity Donation = { donorSub: String };
+
+  action "projects:create", "projects:update", "projects:publish", "projects:listManage"
+    appliesTo { principal: User, resource: Application };
+  action "donations:create", "donations:readOwn"
+    appliesTo { principal: User, resource: Application };
+  action "donations:simulate", "donations:readById"
+    appliesTo { principal: User, resource: [Application, Donation] };
+  action "audit:read"
+    appliesTo { principal: User, resource: Application };
+}

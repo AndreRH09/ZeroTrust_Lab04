@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+/* Foco visible en todos los controles (WCAG 2.2 · 2.4.7 / 2.4.11, CA-NF06.2). */
+@layer base {
+  :focus-visible {
+    outline: 3px solid var(--color-amber-500);
+    outline-offset: 2px;
+  }
+}

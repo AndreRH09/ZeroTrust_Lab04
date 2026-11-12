@@ -1,0 +1,48 @@
+meta {
+  name: GESTOR crea, edita y publica
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{apiUrl}}/v1/projects
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{gestorToken}}
+}
+
+body:json {
+  { "title": "Proyecto de prueba Bruno", "description": "Proyecto ficticio creado por la colección de pruebas", "goalAmountCents": 150000 }
+}
+
+script:post-response {
+  // Continúa el flujo: editar → publicar → editar publicado (409) → republicar (409).
+  const id = res.getBody().projectId;
+  const base = bru.getProcessEnv("API_URL") + "/v1/projects/" + id;
+  const headers = { Authorization: "Bearer " + bru.getProcessEnv("GESTOR_TOKEN"), "Content-Type": "application/json" };
+  const axios = require("axios");
+  const call = (method, url, data) =>
+    axios({ method, url, data, headers, validateStatus: () => true }).then((r) => r.status);
+  bru.setVar("st_edit", await call("patch", base, { title: "Título editado" }));
+  bru.setVar("st_pub", await call("patch", base + "/publish"));
+  bru.setVar("st_edit_pub", await call("patch", base, { title: "Otro título" }));
+  bru.setVar("st_repub", await call("patch", base + "/publish"));
+}
+
+tests {
+  test("CA-08.1 crear → 201 BORRADOR", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().status).to.equal("BORRADOR");
+  });
+  test("editar BORRADOR → 200", function () { expect(bru.getVar("st_edit")).to.equal(200); });
+  test("CA-08.2 publicar → 200", function () { expect(bru.getVar("st_pub")).to.equal(200); });
+  test("editar PUBLICADO → 409", function () { expect(bru.getVar("st_edit_pub")).to.equal(409); });
+  test("CA-08.2 republicar → 409", function () { expect(bru.getVar("st_repub")).to.equal(409); });
+}
+
+docs {
+  @trace HU-08, CA-08.1, CA-08.2, CA-08.3
+}

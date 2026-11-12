@@ -1,0 +1,45 @@
+meta {
+  name: T05 donación válida
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{apiUrl}}/v1/donations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{donorToken}}
+}
+
+headers {
+  Idempotency-Key: {{idemKey}}
+}
+
+script:pre-request {
+  bru.setVar("idemKey", require("crypto").randomUUID());
+}
+
+body:json {
+  { "projectId": "{{projectId}}", "amountCents": 2500 }
+}
+
+script:post-response {
+  bru.setVar("donationId", res.getBody().donationId);
+}
+
+tests {
+  test("T05 · CA-05.1 → 201 PENDIENTE_SIMULACION", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().status).to.equal("PENDIENTE_SIMULACION");
+  });
+  test("CA-05.3 no expone donorSub", function () {
+    expect(res.getBody()).to.not.have.property("donorSub");
+  });
+}
+
+docs {
+  @trace HU-05, CA-05.1, CA-05.3, CA-05.5, T05
+}

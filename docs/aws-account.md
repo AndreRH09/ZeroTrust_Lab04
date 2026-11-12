@@ -94,7 +94,7 @@ sam validate --lint --template-file infra/template.yaml --region us-east-2
 sam deploy --template-file infra/template.yaml --stack-name zerotrust-lab04 --region us-east-2 --profile zerotrust-lab04 --resolve-s3 --capabilities CAPABILITY_IAM --parameter-overrides Stage=academic --confirm-changeset
 ```
 
-(`sam build` no se necesita todavía: la pila base no tiene funciones Lambda. Se añade con T027 y T042.)
+(Despliegue de la pila base, sin funciones Lambda: por eso no hizo falta empaquetarlas. El despliegue completo está en §7.1.)
 
 | Resultado | Valor |
 |---|---|
@@ -107,6 +107,25 @@ sam deploy --template-file infra/template.yaml --stack-name zerotrust-lab04 --re
 | `CognitoDomainUrl` | `https://zerotrust-lab04-aqp.auth.us-east-2.amazoncognito.com` |
 | Tablas | `zerotrust-lab04-{Projects,Donations,Idempotency,AuditEvents}Table-…` |
 | Evidencia | [captura de la salida de `sam deploy` y de la pila en CloudFormation, tapando el Account ID] |
+
+### 7.1 Despliegue completo (Lambdas, trigger de MFA, S3 y CloudFront)
+
+Sobre la misma pila se añadieron las seis funciones Lambda con su rol IAM propio, `PreAuthFn` (T027), el bucket privado del frontend y CloudFront (`infra/template.yaml` de la rama `main`). El despliegue se hace **de forma supervisada**: se empaquetan las Lambdas, se revisa la lista de cambios (changeset) y solo entonces se confirma. `scripts/deploy-api.sh` automatiza lo mismo pero despliega sin mostrar el changeset, por lo que no se usó (`design.md` §10: los despliegues no se ejecutan sin supervisión).
+
+```bash
+npm ci
+npm run build -w backend      # esbuild → backend/dist
+sam deploy --template-file infra/template.yaml --stack-name zerotrust-lab04 --region us-east-2 --profile zerotrust-lab04 --resolve-s3 --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND --parameter-overrides Stage=academic CognitoDomainPrefix=zerotrust-lab04-aqp EnableAvp=false --confirm-changeset
+```
+
+CloudFront crea la URL del frontend durante este primer despliegue; esa URL se registra después como `WebOrigin` (URLs de retorno de Cognito y CORS) con un **segundo** despliegue idéntico más `WebOrigin=https://<distribución>.cloudfront.net`.
+
+| Resultado | Valor |
+|---|---|
+| Changeset revisado | [recursos nuevos y modificados; confirmar que no hay reemplazos del user pool] |
+| Estado de la pila | [UPDATE_COMPLETE] |
+| `WebUrl` | [https://…cloudfront.net] |
+| Evidencia | [captura del changeset y de la pila actualizada, tapando el Account ID] |
 
 ## 8. Limpieza (T106)
 

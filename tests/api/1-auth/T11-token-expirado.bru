@@ -1,0 +1,25 @@
+meta {
+  name: T11 token expirado
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{apiUrl}}/v1/donations/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{expiredToken}}
+}
+
+tests {
+  test("T11 · CA-03.2 expirado (> 15 min) → 401", function () {
+    expect(res.getStatus()).to.equal(401);
+  });
+}
+
+docs {
+  @trace HU-03, CA-03.2, CA-03.3, T11, T13
+}

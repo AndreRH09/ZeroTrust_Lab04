@@ -13,6 +13,7 @@
 param(
   [Parameter(Mandatory = $true)][string]$Email,
   [Parameter(Mandatory = $true)][ValidateSet('DONANTE', 'GESTOR', 'AUDITOR')][string]$Group,
+  [switch]$SkipMfa,  # solo para el usuario de la prueba T14 (GESTOR sin TOTP)
   [string]$ProfileName = 'zerotrust-lab04',
   [string]$Region = 'us-east-2',
   [string]$StackName = 'zerotrust-lab04'
@@ -53,7 +54,10 @@ if ($LASTEXITCODE -ne 0) {
 Invoke-Aws cognito-idp admin-set-user-password --user-pool-id $Pool --username $Email --password $plain --permanent | Out-Null
 
 # 2) Privilegiados: enrolar TOTP antes de asignar el grupo
-if ($Group -ne 'DONANTE') {
+if ($SkipMfa -and $Group -ne 'DONANTE') {
+  Write-Warning 'Se omite el enrolamiento TOTP: usar SOLO para la prueba T14 (gestor sin segundo factor).'
+}
+if ($Group -ne 'DONANTE' -and -not $SkipMfa) {
   $auth = (Invoke-Aws cognito-idp admin-initiate-auth --user-pool-id $Pool --client-id $AdminClient --auth-flow ADMIN_USER_PASSWORD_AUTH --auth-parameters "USERNAME=$Email,PASSWORD=$plain" | Out-String) | ConvertFrom-Json
   $access = $auth.AuthenticationResult.AccessToken
   if (-not $access) { throw 'No se obtuvo access token (el usuario ya tiene MFA configurado o la contrasena es incorrecta).' }

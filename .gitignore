@@ -33,3 +33,4 @@ desktop.ini
 
 # graphify output
 graphify-out/
+!.env.example

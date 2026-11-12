@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+.aws-sam
+.specify
+.claude
+specs
+*.md
+package-lock.json
+infra/template.yaml
+tests/api
+docs/api.yaml
