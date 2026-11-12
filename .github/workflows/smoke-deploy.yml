@@ -26,5 +26,5 @@ jobs:
       COGNITO_DOMAIN: ${{ vars.COGNITO_DOMAIN || 'https://zerotrust-lab04-aqp.auth.us-east-2.amazoncognito.com' }}
       SPA_CLIENT_ID: ${{ vars.SPA_CLIENT_ID || '5iln8ismuog3palsrebjptrafe' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: bash scripts/smoke-deploy.sh
