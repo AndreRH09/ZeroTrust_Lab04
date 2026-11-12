@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Compila la SPA con la configuración pública de la pila y la publica en S3 + CloudFront (T095).
 set -euo pipefail
+# Git Bash (Windows) convertiría "/index.html" y "/" en rutas de disco y CloudFront rechazaría
+# la invalidación (InvalidArgument); esta variable desactiva esa conversión. No afecta a Linux.
+export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/.."
 
 STACK="${STACK:-zerotrust-lab04}"

@@ -122,9 +122,10 @@ CloudFront crea la URL del frontend durante este primer despliegue; esa URL se r
 
 | Resultado | Valor |
 |---|---|
-| Changeset revisado | [recursos nuevos y modificados; confirmar que no hay reemplazos del user pool] |
-| Estado de la pila | [UPDATE_COMPLETE] |
-| `WebUrl` | [https://…cloudfront.net] |
+| Changeset revisado | 39 recursos nuevos (7 funciones Lambda con su log group, rol IAM y permisos de invocación; bucket privado, OAC, política de cabeceras y distribución de CloudFront; política del bucket) y 2 modificaciones sin reemplazo: `UserPool` (añade el trigger `PreAuthentication`) y `Api` (rutas). Ningún `Remove` |
+| Estado de la pila | `UPDATE_COMPLETE` el 2026-11-11 |
+| `WebUrl` | `https://d16kz767amey5o.cloudfront.net` |
+| Verified Permissions | No desplegado (`EnableAvp=false`; extensión HU-12 opcional) |
 | Evidencia | [captura del changeset y de la pila actualizada, tapando el Account ID] |
 
 ## 8. Limpieza (T106)
@@ -137,3 +138,5 @@ El procedimiento y su verificación se documentan en `evidence/RNF-HU-09-limpiez
 |---|---|---|---|
 | 2026-11-11 | Primer `sam deploy` de la pila `zerotrust-lab04` falló y la pila quedó en `ROLLBACK_COMPLETE` | `SpaClient` declaraba `ExplicitAuthFlows: [ALLOW_REFRESH_TOKEN_AUTH]` junto con `RefreshTokenRotation`; Cognito responde «ALLOW_REFRESH_TOKEN_AUTH is not a permitted ExplicitAuthFlow when refresh token rotation is enabled». `sam validate --lint` no lo detecta porque la validación ocurre en el servicio | Cambiar a `ExplicitAuthFlows: [ALLOW_USER_SRP_AUTH]` (el refresco usa el grant `refresh_token` del flujo OAuth), eliminar la pila fallida y volver a desplegar |
 | 2026-11-11 | `sam deploy --resolve-s3` creó el bucket gestionado `aws-sam-cli-managed-default-samclisourcebucket-…` | Comportamiento normal de SAM: guarda los artefactos de despliegue en una pila propia (`aws-sam-cli-managed-default`) | Incluirlo en la limpieza final (T106): `sam delete` no elimina esa pila; hay que vaciar el bucket y borrar la pila a mano |
+| 2026-11-12 | `deploy-web.sh` terminó con `InvalidArgument: invalid invalidation paths` al invalidar CloudFront (los archivos sí se habían subido a S3) | Git Bash (Windows) convierte los argumentos `/index.html` y `/` en rutas de disco (`C:/Program Files/Git/...`) antes de pasarlos a `aws` | Añadir `export MSYS_NO_PATHCONV=1` a `scripts/deploy-web.sh`; no afecta a Linux |
+| 2026-11-12 | La SPA no carga el catálogo («Ocurrió un error inesperado»). La consola del navegador muestra `blocked by CORS policy: No 'Access-Control-Allow-Origin' header`; `GET /v1/projects` con `curl` sí responde 200 | Se usaba `!If` dentro de `AllowOrigins`. SAM copió ese `Fn::If` como si fuera **todo** el bloque `x-amazon-apigateway-cors` (se perdieron métodos, cabeceras y `maxAge`) y API Gateway lo ignoró: `aws apigatewayv2 get-api` mostraba `CorsConfiguration: null`. Las pruebas con `curl` no lo detectaron porque solo los navegadores aplican CORS | Poner el `!If` sobre toda la `CorsConfiguration`, con las dos ramas completas. Se verificó con el traductor local de SAM antes de desplegar, y se redesplegó la pila |
