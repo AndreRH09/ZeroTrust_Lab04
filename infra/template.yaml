@@ -279,14 +279,19 @@ Resources:
       DefaultRouteSettings:
         ThrottlingRateLimit: 20 # solicitudes por segundo (research R-06)
         ThrottlingBurstLimit: 40
-      CorsConfiguration:
-        AllowOrigins: !If
-          - HasWebOrigin
-          - ["http://localhost:5173", !Ref WebOrigin]
-          - ["http://localhost:5173"]
-        AllowMethods: [GET, POST, PATCH, OPTIONS]
-        AllowHeaders: [Authorization, Content-Type, Idempotency-Key]
-        MaxAge: 600
+      # El !If va sobre la CorsConfiguration completa, no dentro de AllowOrigins: SAM copiaba el
+      # Fn::If de AllowOrigins como si fuera todo el bloque x-amazon-apigateway-cors y API Gateway
+      # lo ignoraba (la API desplegada quedó con cors = null; ver docs/aws-account.md §9).
+      CorsConfiguration: !If
+        - HasWebOrigin
+        - AllowOrigins: ["http://localhost:5173", !Ref WebOrigin]
+          AllowMethods: [GET, POST, PATCH, OPTIONS]
+          AllowHeaders: [Authorization, Content-Type, Idempotency-Key]
+          MaxAge: 600
+        - AllowOrigins: ["http://localhost:5173"]
+          AllowMethods: [GET, POST, PATCH, OPTIONS]
+          AllowHeaders: [Authorization, Content-Type, Idempotency-Key]
+          MaxAge: 600
       AccessLogSettings:
         DestinationArn: !GetAtt ApiAccessLogGroup.Arn
         # JSON sin Authorization, tokens ni sub (CA-NF01.2, CA-NF07.1)
