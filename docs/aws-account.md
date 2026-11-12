@@ -80,8 +80,9 @@ Evidencia: [captura de las cuatro versiones]. Configuración de credenciales: [d
 
 ```bash
 sam validate --lint --template-file infra/template.yaml --region us-east-2
-sam build --template-file infra/template.yaml
-sam deploy --region us-east-2 --profile zerotrust-lab04
+# Empaqueta las Lambdas con esbuild (backend/dist) y despliega; no requiere `sam build`.
+AWS_PROFILE=zerotrust-lab04 npm run deploy:api
+AWS_PROFILE=zerotrust-lab04 npm run deploy:web
 ```
 
 | Resultado | Valor |

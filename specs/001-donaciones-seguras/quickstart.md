@@ -22,13 +22,12 @@ Esperado: todo en verde; los tests de seguridad muestran sus etiquetas `T##` y `
 
 ## 2. Despliegue del stage `academic`
 
-```powershell
-sam build --template infra/template.yaml
-sam deploy --guided --profile zerotrust-lab04 --region us-east-2 --parameter-overrides Stage=academic
+```bash
+AWS_PROFILE=zerotrust-lab04 npm run deploy:api   # build de Lambdas + sam deploy (2 pasadas la 1.ª vez)
+AWS_PROFILE=zerotrust-lab04 npm run deploy:web   # build de la SPA con los outputs + S3 + invalidación
 ```
 
-Anotar outputs: `ApiUrl`, `UserPoolId`, `UserPoolClientId`, `CognitoDomain`, `CloudFrontUrl`.
-Luego publicar la SPA: `npm run build -w frontend` y `aws s3 sync frontend/dist s3://<bucket> --delete`.
+Outputs: `ApiUrl`, `UserPoolId`, `SpaClientId`, `AdminCliClientId`, `CognitoDomainUrl`, `WebUrl`.
 
 ## 3. Usuarios de prueba (solo ficticios)
 
@@ -58,9 +57,8 @@ Guardar capturas sanitizadas (sin Account ID, tokens ni correos) en `evidence/`.
 
 ## 5. Limpieza (RNF-HU-09)
 
-```powershell
-aws s3 rm s3://<bucket> --recursive --profile zerotrust-lab04
-sam delete --profile zerotrust-lab04 --region us-east-2
+```bash
+AWS_PROFILE=zerotrust-lab04 bash scripts/cleanup.sh
 ```
 
 Verificar en Resource Explorer / Tag Editor (`us-east-2` y `us-east-1` para CloudWatch Logs) que no
