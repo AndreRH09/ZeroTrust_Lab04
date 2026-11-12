@@ -122,9 +122,10 @@ CloudFront crea la URL del frontend durante este primer despliegue; esa URL se r
 
 | Resultado | Valor |
 |---|---|
-| Changeset revisado | [recursos nuevos y modificados; confirmar que no hay reemplazos del user pool] |
-| Estado de la pila | [UPDATE_COMPLETE] |
-| `WebUrl` | [https://…cloudfront.net] |
+| Changeset revisado | 39 recursos nuevos (7 funciones Lambda con su log group, rol IAM y permisos de invocación; bucket privado, OAC, política de cabeceras y distribución de CloudFront; política del bucket) y 2 modificaciones sin reemplazo: `UserPool` (añade el trigger `PreAuthentication`) y `Api` (rutas). Ningún `Remove` |
+| Estado de la pila | `UPDATE_COMPLETE` el 2026-11-11 |
+| `WebUrl` | `https://d16kz767amey5o.cloudfront.net` |
+| Verified Permissions | No desplegado (`EnableAvp=false`; extensión HU-12 opcional) |
 | Evidencia | [captura del changeset y de la pila actualizada, tapando el Account ID] |
 
 ## 8. Limpieza (T106)
