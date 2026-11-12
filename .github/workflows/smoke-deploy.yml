@@ -7,6 +7,8 @@ name: Smoke despliegue
 on:
   push:
     branches: [main]
+  pull_request:
+    paths: [scripts/smoke-deploy.sh, .github/workflows/smoke-deploy.yml]
   schedule:
     - cron: "0 13 * * *" # 08:00 en Perú
   workflow_dispatch:
