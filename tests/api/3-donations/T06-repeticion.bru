@@ -1,0 +1,34 @@
+meta {
+  name: T06 misma clave y misma carga
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{apiUrl}}/v1/donations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{donorToken}}
+}
+
+headers {
+  Idempotency-Key: {{idemKey}}
+}
+
+body:json {
+  { "projectId": "{{projectId}}", "amountCents": 2500 }
+}
+
+tests {
+  test("T06 · CA-05.4 mismo resultado, una sola donación", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().donationId).to.equal(bru.getVar("donationId"));
+  });
+}
+
+docs {
+  @trace HU-05, RNF-HU-04, CA-05.4, T06
+}

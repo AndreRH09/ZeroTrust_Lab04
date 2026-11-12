@@ -1,0 +1,28 @@
+meta {
+  name: T01 visitante consulta proyectos
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{apiUrl}}/v1/projects
+  body: none
+  auth: none
+}
+
+tests {
+  test("T01 · CA-01.1 → 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("T01 · CA-01.2 sin borradores", function () {
+    const items = res.getBody().items;
+    expect(items.every((p) => p.status === "PUBLICADO")).to.equal(true);
+  });
+  test("CA-09.2 sin datos de donantes", function () {
+    expect(JSON.stringify(res.getBody())).to.not.contain("donorSub");
+  });
+}
+
+docs {
+  @trace HU-01, HU-09, CA-01.1, CA-01.2, CA-09.1, CA-09.2, T01
+}

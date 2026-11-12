@@ -1,0 +1,35 @@
+meta {
+  name: T12 gestor consulta historial de donante
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{apiUrl}}/v1/donations/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{gestorToken}}
+}
+
+script:post-response {
+  const axios = require("axios");
+  const r = await axios({
+    method: "get",
+    url: bru.getProcessEnv("API_URL") + "/v1/donations/" + bru.getVar("donationId"),
+    headers: { Authorization: "Bearer " + bru.getProcessEnv("GESTOR_TOKEN") },
+    validateStatus: () => true,
+  });
+  bru.setVar("st_by_id", r.status);
+}
+
+tests {
+  test("T12 · CA-04.2 /me → 403", function () { expect(res.getStatus()).to.equal(403); });
+  test("T12 · CA-04.2 por id → 403/404", function () { expect([403, 404]).to.include(bru.getVar("st_by_id")); });
+}
+
+docs {
+  @trace HU-04, HU-07, CA-04.2, T12
+}

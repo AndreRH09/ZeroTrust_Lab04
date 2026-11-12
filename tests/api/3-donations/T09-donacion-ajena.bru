@@ -1,0 +1,28 @@
+meta {
+  name: T09 donante B consulta donación de A
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{apiUrl}}/v1/donations/{{donationId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{donorBToken}}
+}
+
+tests {
+  test("T09 · CA-07.2 → 404 sin filtrar datos", function () {
+    expect(res.getStatus()).to.equal(404);
+    const s = JSON.stringify(res.getBody());
+    expect(s).to.not.contain("amountCents");
+    expect(s).to.not.contain("PENDIENTE");
+  });
+}
+
+docs {
+  @trace HU-07, CA-07.1, CA-07.2, T09
+}

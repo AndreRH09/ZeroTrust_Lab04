@@ -1,0 +1,34 @@
+meta {
+  name: Suplantación por body (donorSub, groups, role)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{apiUrl}}/v1/donations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{donorToken}}
+}
+
+headers {
+  Idempotency-Key: 5e3f0a9b-1c2d-4e5f-8a7b-6c5d4e3f2a1b
+  X-User-Groups: GESTOR
+}
+
+body:json {
+  { "projectId": "{{projectId}}", "amountCents": 2500, "donorSub": "otro-usuario", "groups": ["GESTOR"], "role": "AUDITOR" }
+}
+
+tests {
+  test("CA-04.3 · CA-NF02.2 campos de identidad en el body → 400 (strict)", function () {
+    expect(res.getStatus()).to.equal(400);
+  });
+}
+
+docs {
+  @trace HU-04, RNF-HU-02, CA-04.3, CA-NF02.2, CA-05.3
+}

@@ -1,0 +1,28 @@
+meta {
+  name: T11 token con firma alterada
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{apiUrl}}/v1/donations/me
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  // Cambia el último carácter de la firma del access token válido.
+  const t = bru.getProcessEnv("DONOR_TOKEN") || "";
+  const last = t.slice(-1) === "A" ? "B" : "A";
+  req.setHeader("Authorization", "Bearer " + t.slice(0, -1) + last);
+}
+
+tests {
+  test("T11 · CA-03.2 firma alterada → 401", function () {
+    expect(res.getStatus()).to.equal(401);
+  });
+}
+
+docs {
+  @trace HU-03, RNF-HU-02, CA-03.2, CA-NF02.1, T11
+}
