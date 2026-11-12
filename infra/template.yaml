@@ -204,7 +204,10 @@ Resources:
         - api/donations.read
         - api/audit.read
       SupportedIdentityProviders: [COGNITO]
-      ExplicitAuthFlows: [ALLOW_REFRESH_TOKEN_AUTH] # sin ALLOW_USER_PASSWORD_AUTH
+      # Con la rotación del refresh token activada, Cognito no admite ALLOW_REFRESH_TOKEN_AUTH
+      # (error de despliegue del 2026-11-11, ver docs/aws-account.md §9): el refresco se hace
+      # con el grant refresh_token del flujo OAuth. Sin ALLOW_USER_PASSWORD_AUTH (T016).
+      ExplicitAuthFlows: [ALLOW_USER_SRP_AUTH]
       TokenValidityUnits:
         AccessToken: minutes
         IdToken: minutes
