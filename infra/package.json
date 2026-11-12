@@ -1,0 +1,15 @@
+{
+  "name": "@aqp/infra",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "vitest": "5.1.0",
+    "yaml": "2.9.1"
+  }
+}

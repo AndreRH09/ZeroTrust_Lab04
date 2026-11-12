@@ -1,0 +1,40 @@
+# CI (CA-NF08.1): lint, typecheck, tests, build y auditoría de dependencias en cada PR.
+# Sin credenciales AWS ni secretos (CA-NF03.2).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Formato
+        run: npm run format:check
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests (shared, backend, frontend, infra)
+        run: npm test
+      - name: Trazabilidad HU/CA/RNF-HU
+        run: npm run trace
+      - name: Build (Lambdas + SPA)
+        run: npm run build
+      - name: Auditoría de dependencias
+        run: npm audit --audit-level=high

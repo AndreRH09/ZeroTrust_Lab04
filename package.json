@@ -1,0 +1,36 @@
+{
+  "name": "zerotrust-lab04",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Plataforma de Donaciones Seguras (Fundación AQP-SOLIDARIA) - prototipo académico Zero Trust",
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "backend",
+    "frontend",
+    "infra"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "trace": "node scripts/check-traceability.mjs",
+    "deploy:api": "bash scripts/deploy-api.sh",
+    "deploy:web": "bash scripts/deploy-web.sh"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.14.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.14.0",
+    "prettier": "3.10.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.2"
+  }
+}
