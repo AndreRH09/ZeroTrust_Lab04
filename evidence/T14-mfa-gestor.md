@@ -50,7 +50,7 @@ Los usuarios que sí enrolaron TOTP antes de entrar al grupo tienen el factor pr
 | `gestor1@example.com` | GESTOR | `SOFTWARE_TOKEN_MFA` | `SOFTWARE_TOKEN_MFA` |
 | `auditor1@example.com` | AUDITOR | `SOFTWARE_TOKEN_MFA` | `SOFTWARE_TOKEN_MFA` |
 
-Con `gestor1`, tras la contraseña Cognito pide el código TOTP; el inicio de sesión se completó solo con el código (flujo usado para crear y publicar el proyecto de prueba). *[Confirmar con captura de la pantalla que pide el código de 6 dígitos.]*
+Con `gestor1`, tras la contraseña Cognito pide el código TOTP; el inicio de sesión se completó solo con el código (flujo usado para crear y publicar el proyecto de prueba). Captura de la pantalla que pide el código de 6 dígitos: `evidence/img/T14-totp-gestor.png`.
 
 ## Qué demuestra
 

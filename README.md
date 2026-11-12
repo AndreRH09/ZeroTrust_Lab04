@@ -117,9 +117,20 @@ node scripts/measure-perf.mjs --seed                 # RNF-HU-05
 AWS_PROFILE=zerotrust-lab04 bash scripts/cleanup.sh   # vacía el bucket y ejecuta sam delete
 ```
 
-Verificar en Resource Explorer (`us-east-2`) y en CloudWatch Logs de `us-east-1` que no queden
-recursos. La pila `aws-sam-cli-managed-default` (bucket de artefactos de SAM) se elimina aparte si ya
-no se usa.
+Pasos completos (T106), **solo después de la demo y la evaluación**:
+
+1. Estado inicial: `AWS_PROFILE=zerotrust-lab04 bash scripts/verify-cleanup.sh` (solo lectura).
+2. `scripts/cleanup.sh`: vacía el bucket del frontend y ejecuta `sam delete`.
+3. **Bucket de artefactos de SAM:** tiene el versionado activado, por lo que `aws s3 rm` no lo vacía.
+   Vaciarlo desde la consola de S3 (*Empty*, que borra también versiones y marcadores de borrado) y
+   luego eliminar la pila `aws-sam-cli-managed-default`.
+4. **Desactivar** el workflow `.github/workflows/smoke-deploy.yml` (corre a diario y fallaría sin la pila).
+5. Verificar: `scripts/verify-cleanup.sh` debe terminar con `total = 0`. Equivale a Resource Explorer
+   (`us-east-2`) y a los grupos de logs de `us-east-1`.
+6. Registrar el antes y el después en `evidence/RNF-HU-09-limpieza.md`.
+
+Alcance: solo recursos con prefijo `zerotrust-lab04` y la pila de artefactos de SAM. Las pilas de
+Amplify (`notesapp`) y `CDKToolkit` pertenecen a otro laboratorio y no se tocan aquí.
 
 ## Restricciones de la cuenta
 
@@ -130,6 +141,9 @@ no se usa.
 
 ## Contribución
 
-- `main` protegida: PR con al menos una revisión de otro integrante y CI en verde.
-- Ramas cortas; commits pequeños; nada de llaves, tokens ni datos reales (secret scanning activo).
+- `main` protegida por el ruleset activo «Proteger Main» (sin lista de excepciones): todo cambio entra
+  por PR con al menos **una aprobación**, que se descarta si llegan commits nuevos. El CI
+  (`.github/workflows/ci.yml`) se ejecuta en cada PR. Evidencia: [evidence/T007-proteccion-main.md](evidence/T007-proteccion-main.md).
+- Ramas cortas; commits pequeños; nada de llaves, tokens ni datos reales: *secret protection* y
+  *push protection* activos (bloquean los push que contienen secretos conocidos).
 - Uso de IA declarado en [AI_USAGE.md](AI_USAGE.md).
