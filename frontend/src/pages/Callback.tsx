@@ -25,7 +25,10 @@ export function Callback() {
 
   if (failed) {
     return (
-      <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800">
+      <div
+        role="alert"
+        className="mx-auto max-w-lg rounded-xl border border-red-200 bg-red-50 p-4 text-red-800"
+      >
         No se pudo completar el inicio de sesión. Vuelve a intentarlo.
       </div>
     );

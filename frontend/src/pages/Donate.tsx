@@ -8,9 +8,27 @@ import { useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router";
 import { z } from "zod";
 import { useAuth } from "../auth/useAuth";
-import { btnPrimary, ErrorMessage, input, Loading } from "../components/States";
+import { ArrowLeftIcon, LockIcon } from "../components/Icons";
+import { ProgressBar } from "../components/ProgressBar";
+import { ProjectCover } from "../components/ProjectVisuals";
+import {
+  btnDonate,
+  card,
+  ErrorMessage,
+  input,
+  labelCls,
+  link,
+  Loading,
+  Notice,
+  Spinner,
+} from "../components/States";
+import { DonationSteps, TrustList } from "../components/Trust";
+import { categoryOf } from "../lib/category";
 import { formatPEN, parsePENToCents } from "../lib/money";
 import { api } from "../services/api";
+
+/** Montos sugeridos modestos: anclas altas pueden reducir la conversión (pruebas A/B de NextAfter). */
+const PRESETS_SOLES = [20, 50, 100, 200] as const;
 
 const DonateForm = z.object({
   amount: z.string().superRefine((v, ctx) => {
@@ -45,7 +63,9 @@ export function Donate() {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    setValue,
+    watch,
+    formState: { errors, isSubmitted },
   } = useForm<DonateForm>({ resolver: zodResolver(DonateForm), defaultValues: { amount: "" } });
 
   const mutation = useMutation({
@@ -59,67 +79,179 @@ export function Donate() {
     onSuccess: (donation) => navigate(`/donations/${donation.donationId}`),
   });
 
+  const amount = watch("amount");
   if (project.isPending) return <Loading />;
   if (project.error) return <ErrorMessage error={project.error} />;
 
+  const p = project.data;
+  const cents = parsePENToCents(amount ?? "");
+  const validCents =
+    cents !== null && cents >= MIN_AMOUNT_CENTS && cents <= MAX_AMOUNT_CENTS ? cents : null;
+
   const onSubmit = (v: DonateForm) => {
-    const cents = parsePENToCents(v.amount);
-    if (cents !== null) mutation.mutate(cents);
+    const c = parsePENToCents(v.amount);
+    if (c !== null) mutation.mutate(c);
   };
 
   return (
-    <section
-      aria-labelledby="titulo-donar"
-      className="mx-auto max-w-lg rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
-    >
-      <h1 id="titulo-donar" className="text-xl font-bold">
-        Donar a «{project.data.title}»
-      </h1>
-      <p className="mt-2 rounded bg-amber-50 p-3 text-sm text-amber-900">
-        Simulación académica: registrarás una intención de donación de prueba. No se solicita ni se
-        procesa ningún medio de pago.
-      </p>
+    <div className="space-y-8">
+      <div className="flex flex-col gap-5">
+        <Link
+          to={`/projects/${projectId}`}
+          className="inline-flex w-fit items-center gap-1 text-sm text-stone-500 hover:text-brand-800"
+        >
+          <ArrowLeftIcon className="size-4" />
+          Volver al proyecto
+        </Link>
+        <DonationSteps current={1} />
+      </div>
 
-      <form noValidate className="mt-4" onSubmit={handleSubmit(onSubmit)}>
-        <label htmlFor="amount" className="block text-sm font-medium">
-          Monto en soles (PEN)
-        </label>
-        <div className="relative">
-          <input
-            id="amount"
-            inputMode="decimal"
-            autoComplete="off"
-            placeholder="25.00"
-            className={input}
-            aria-invalid={errors.amount ? "true" : "false"}
-            aria-describedby={errors.amount ? "amount-error amount-help" : "amount-help"}
-            {...register("amount")}
-          />
-        </div>
-        <p id="amount-help" className="mt-1 text-xs text-slate-600">
-          Entre {formatPEN(MIN_AMOUNT_CENTS)} y {formatPEN(MAX_AMOUNT_CENTS)}, máximo dos decimales.
-        </p>
-        {errors.amount && (
-          <p id="amount-error" role="alert" className="mt-1 text-sm text-red-700">
-            {errors.amount.message}
-          </p>
-        )}
-
-        {mutation.error && (
-          <div className="mt-3">
-            <ErrorMessage error={mutation.error} />
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section aria-labelledby="titulo-donar" className={`${card} p-6 sm:p-8`}>
+          <h1 id="titulo-donar" className="text-2xl font-bold tracking-tight text-balance">
+            Donar a «{p.title}»
+          </h1>
+          <div className="mt-4">
+            <Notice>
+              Simulación académica: registrarás una intención de donación de prueba. No se solicita
+              ni se procesa ningún medio de pago.
+            </Notice>
           </div>
-        )}
 
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          <button type="submit" className={btnPrimary} disabled={mutation.isPending}>
-            {mutation.isPending ? "Registrando…" : "Registrar intención"}
-          </button>
-          <Link to={`/projects/${projectId}`} className="text-sm underline">
-            Cancelar
-          </Link>
-        </div>
-      </form>
-    </section>
+          <form noValidate className="mt-6" onSubmit={handleSubmit(onSubmit)}>
+            <fieldset>
+              <legend className={labelCls}>Montos sugeridos</legend>
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {PRESETS_SOLES.map((s) => {
+                  const selected = validCents === s * 100;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() =>
+                        setValue("amount", String(s), {
+                          shouldValidate: isSubmitted,
+                          shouldDirty: true,
+                        })
+                      }
+                      className={`min-h-12 rounded-xl text-base font-bold tabular-nums ring-1 transition-colors ring-inset ${
+                        selected
+                          ? "bg-coral-50 text-coral-800 ring-2 ring-coral-600"
+                          : "bg-white text-stone-800 ring-sand-300 hover:bg-sand-100"
+                      }`}
+                    >
+                      S/ {s}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            <div className="mt-5">
+              <label htmlFor="amount" className={labelCls}>
+                Monto en soles (PEN)
+              </label>
+              <div className="relative">
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 left-0 flex items-center pt-1.5 pl-4 text-xl font-semibold text-stone-500"
+                >
+                  S/
+                </span>
+                <input
+                  id="amount"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  placeholder="25.00"
+                  className={`${input} pl-11 text-xl font-semibold tabular-nums`}
+                  aria-invalid={errors.amount ? "true" : "false"}
+                  aria-describedby={errors.amount ? "amount-error amount-help" : "amount-help"}
+                  {...register("amount")}
+                />
+              </div>
+              <p id="amount-help" className="mt-1.5 text-xs text-stone-500">
+                Entre {formatPEN(MIN_AMOUNT_CENTS)} y {formatPEN(MAX_AMOUNT_CENTS)}, máximo dos
+                decimales.
+              </p>
+              {errors.amount && (
+                <p
+                  id="amount-error"
+                  role="alert"
+                  className="mt-1.5 text-sm font-medium text-red-700"
+                >
+                  {errors.amount.message}
+                </p>
+              )}
+            </div>
+
+            <div
+              aria-live="polite"
+              className="mt-6 rounded-xl bg-sand-100 p-4 text-sm text-stone-700"
+            >
+              {validCents !== null ? (
+                <p>
+                  Registrarás una intención de{" "}
+                  <strong className="text-stone-900">{formatPEN(validCents)}</strong> para «
+                  {p.title}». Luego podrás simular su confirmación.
+                </p>
+              ) : (
+                <p>Elige un monto sugerido o escribe otro para ver el resumen.</p>
+              )}
+            </div>
+
+            {mutation.error && (
+              <div className="mt-4">
+                <ErrorMessage error={mutation.error} />
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className={`${btnDonate} mt-6 w-full text-base`}
+              disabled={mutation.isPending}
+            >
+              {mutation.isPending ? (
+                <>
+                  <Spinner className="size-4 text-white" />
+                  Registrando…
+                </>
+              ) : (
+                "Registrar intención"
+              )}
+            </button>
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-stone-500">
+              <LockIcon className="size-4" />
+              Sin tarjeta, CVV, número de cuenta ni documento de identidad.
+            </p>
+            <p className="mt-4 text-center text-sm">
+              <Link to={`/projects/${projectId}`} className={link}>
+                Cancelar
+              </Link>
+            </p>
+          </form>
+        </section>
+
+        <aside aria-label="Resumen del proyecto" className="space-y-4">
+          <div className={`${card} overflow-hidden`}>
+            <ProjectCover category={categoryOf(p)} size="sm" />
+            <div className="p-5">
+              <p className="font-bold text-stone-900">{p.title}</p>
+              <div className="mt-4">
+                <ProgressBar
+                  confirmedCents={p.confirmedAmountCents}
+                  goalCents={p.goalAmountCents}
+                  label={`Progreso de ${p.title}`}
+                />
+              </div>
+            </div>
+          </div>
+          <div className={`${card} p-5`}>
+            <h2 className="mb-3 text-sm font-bold text-stone-900">Tu donación está protegida</h2>
+            <TrustList />
+          </div>
+        </aside>
+      </div>
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 import { Link, Route, Routes } from "react-router";
 import { Layout } from "./components/Layout";
 import { RequireAuth } from "./components/RequireAuth";
-import { Empty } from "./components/States";
+import { Empty, link } from "./components/States";
 import { Audit } from "./pages/Audit";
 import { Callback } from "./pages/Callback";
 import { Catalog } from "./pages/Catalog";
@@ -61,11 +61,13 @@ export function App() {
         <Route
           path="*"
           element={
-            <Empty title="Página no encontrada">
-              <Link to="/" className="underline">
-                Ir al catálogo
-              </Link>
-            </Empty>
+            <div className="mx-auto max-w-lg">
+              <Empty title="Página no encontrada">
+                <Link to="/" className={link}>
+                  Ir al catálogo
+                </Link>
+              </Empty>
+            </div>
           }
         />
       </Route>
