@@ -14,77 +14,45 @@
 
 El visitante no necesita usuario.
 
-## 2. Preparación (PowerShell, dentro del repo)
+## 2. Cómo se crean
 
-Las contraseñas se piden por consola y **no se escriben en ningún archivo**. Usa contraseñas de 12 o más caracteres con mayúscula, minúscula, número y símbolo (política del user pool).
-
-```powershell
-$Profile_ = 'zerotrust-lab04'; $Region = 'us-east-2'
-$Pool = aws cloudformation describe-stacks --stack-name zerotrust-lab04 --region $Region --profile $Profile_ --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text
-$AdminClient = aws cloudformation describe-stacks --stack-name zerotrust-lab04 --region $Region --profile $Profile_ --query "Stacks[0].Outputs[?OutputKey=='AdminCliClientId'].OutputValue" --output text
-```
-
-## 3. DONANTE (sin MFA)
+Se usa `scripts/create-test-user.ps1`, que ejecuta los comandos de `aws cognito-idp` en el orden correcto. Requiere sesión iniciada (`aws login --profile zerotrust-lab04`) y se ejecuta desde la raíz del repo:
 
 ```powershell
-$email = 'donante1@example.com'
-$pwd1 = Read-Host 'Contraseña para el usuario de prueba' -AsSecureString
-$plain = [System.Net.NetworkCredential]::new('', $pwd1).Password
-aws cognito-idp admin-create-user --user-pool-id $Pool --username $email --user-attributes Name=email,Value=$email Name=email_verified,Value=true --message-action SUPPRESS --region $Region --profile $Profile_
-aws cognito-idp admin-set-user-password --user-pool-id $Pool --username $email --password $plain --permanent --region $Region --profile $Profile_
-aws cognito-idp admin-add-user-to-group --user-pool-id $Pool --username $email --group-name DONANTE --region $Region --profile $Profile_
+powershell -ExecutionPolicy Bypass -File scripts/create-test-user.ps1 -Email donante1@example.com -Group DONANTE
+powershell -ExecutionPolicy Bypass -File scripts/create-test-user.ps1 -Email donante2@example.com -Group DONANTE
+powershell -ExecutionPolicy Bypass -File scripts/create-test-user.ps1 -Email gestor1@example.com -Group GESTOR
+powershell -ExecutionPolicy Bypass -File scripts/create-test-user.ps1 -Email auditor1@example.com -Group AUDITOR
 ```
 
-Repetir con `donante2@example.com`.
+- La contraseña se pide por consola (`SecureString`); no se escribe en ningún archivo. Política del user pool: 12 o más caracteres con mayúscula, minúscula, número y símbolo.
+- El script obtiene el `UserPoolId` y el `AdminCliClientId` desde los outputs de la pila, sin copiarlos a mano.
 
-## 4. GESTOR y AUDITOR (con TOTP, **antes** de asignar el grupo)
+### Orden que sigue el script
 
-El orden importa: el trigger de pre-autenticación (T027) bloquea el login de quien ya está en `GESTOR` o `AUDITOR` sin TOTP. Por eso el enrolamiento se hace **antes** de añadir al grupo.
+1. `admin-create-user` con `--message-action SUPPRESS` (sin correo real) y `admin-set-user-password --permanent`.
+2. **DONANTE:** `admin-add-user-to-group`. Sin MFA, según la matriz de roles.
+3. **GESTOR y AUDITOR**, con TOTP **antes** de asignar el grupo:
+   `admin-initiate-auth` con el cliente `admin-cli` → `associate-software-token` → `verify-software-token` → `admin-set-user-mfa-preference` → `admin-add-user-to-group`.
+
+El orden importa: el trigger de pre-autenticación (T027) bloquea el inicio de sesión de quien ya pertenece a `GESTOR` o `AUDITOR` sin TOTP, y se necesita iniciar sesión para enrolar.
+
+> El enrolamiento imprime el `SecretCode` **una sola vez**. No se captura ni se pega en el repo, el informe o un chat. Si se filtra, se elimina el usuario y se repite.
+
+## 3. Verificación
+
+El script termina mostrando el estado del usuario, su método MFA preferido y sus grupos. Para GESTOR y AUDITOR debe aparecer `SOFTWARE_TOKEN_MFA`. También se puede repetir:
 
 ```powershell
-$email = 'gestor1@example.com'
-$pwd1 = Read-Host 'Contraseña para el usuario de prueba' -AsSecureString
-$plain = [System.Net.NetworkCredential]::new('', $pwd1).Password
-
-# 1) Crear el usuario con contraseña permanente
-aws cognito-idp admin-create-user --user-pool-id $Pool --username $email --user-attributes Name=email,Value=$email Name=email_verified,Value=true --message-action SUPPRESS --region $Region --profile $Profile_
-aws cognito-idp admin-set-user-password --user-pool-id $Pool --username $email --password $plain --permanent --region $Region --profile $Profile_
-
-# 2) Obtener un access token con el cliente admin-cli (sin OAuth)
-$auth = aws cognito-idp admin-initiate-auth --user-pool-id $Pool --client-id $AdminClient --auth-flow ADMIN_USER_PASSWORD_AUTH --auth-parameters "USERNAME=$email,PASSWORD=$plain" --region $Region --profile $Profile_ | ConvertFrom-Json
-$access = $auth.AuthenticationResult.AccessToken
-
-# 3) Asociar la app autenticadora: muestra SecretCode (secreto: NO guardarlo ni capturarlo)
-aws cognito-idp associate-software-token --access-token $access --region $Region --profile $Profile_
-
-# 4) Escribir el SecretCode en la app autenticadora y verificar con el código de 6 dígitos
-$code = Read-Host 'Código TOTP de 6 dígitos'
-aws cognito-idp verify-software-token --access-token $access --user-code $code --friendly-device-name gestor1 --region $Region --profile $Profile_
-
-# 5) Activar TOTP como método preferido y recién entonces asignar el grupo
-aws cognito-idp admin-set-user-mfa-preference --user-pool-id $Pool --username $email --software-token-mfa-settings Enabled=true,PreferredMfa=true --region $Region --profile $Profile_
-aws cognito-idp admin-add-user-to-group --user-pool-id $Pool --username $email --group-name GESTOR --region $Region --profile $Profile_
+aws cognito-idp admin-get-user --user-pool-id <UserPoolId> --username gestor1@example.com --query "{mfa:UserMFASettingList,preferido:PreferredMfaSetting}" --region us-east-2 --profile zerotrust-lab04
 ```
 
-Repetir con `auditor1@example.com` y el grupo `AUDITOR`.
+## 4. Evidencia que se guarda
 
-> El paso 3 imprime el `SecretCode`. **No lo captures** ni lo pegues en el repo, el informe o un chat. Si se filtra, se elimina el usuario y se repite el enrolamiento.
-
-## 5. Verificación
-
-```powershell
-aws cognito-idp list-users-in-group --user-pool-id $Pool --group-name GESTOR --region $Region --profile $Profile_ --query "Users[].Username"
-aws cognito-idp admin-get-user --user-pool-id $Pool --username gestor1@example.com --region $Region --profile $Profile_ --query "{mfa:UserMFASettingList,preferido:PreferredMfaSetting}"
-```
-
-Debe mostrar `SOFTWARE_TOKEN_MFA` como método preferido para `GESTOR` y `AUDITOR`.
-
-## 6. Evidencia que se guarda
-
-- Captura de los usuarios en el user pool (consola de Cognito → Users), **tapando correos si fueran reales**.
-- Captura de `admin-get-user` con `UserMFASettingList` (sin secretos).
+- Captura de los usuarios en Cognito (consola → User pools → Users), con grupos.
+- Captura del resumen final del script (sin el secreto: la pantalla se limpia antes de mostrarlo).
 - Para **T14** (login de GESTOR sin segundo factor): ver `evidence/` cuando el trigger T027 esté desplegado.
 
-## 7. Limpieza
+## 5. Limpieza
 
-Los usuarios se eliminan con la pila (`sam delete`), porque pertenecen al user pool. Ver `evidence/RNF-HU-09-limpieza.md`.
+Los usuarios pertenecen al user pool y se eliminan con la pila (`sam delete`). Ver `evidence/RNF-HU-09-limpieza.md`.
