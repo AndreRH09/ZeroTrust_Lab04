@@ -9,3 +9,4 @@ specs
 package-lock.json
 infra/template.yaml
 tests/api
+docs/api.yaml
